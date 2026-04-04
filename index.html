@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=800, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#2C3E6B">
@@ -38,26 +38,6 @@ body {
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
-/* 縦持ち時:「横に回してください」表示 */
-.portrait-overlay {
-  position: fixed; inset: 0; background: #fff;
-  z-index: 998; display: none;
-  flex-direction: column; align-items: center; justify-content: center;
-  gap: 16px; color: var(--accent);
-}
-.portrait-overlay .rotate-icon {
-  font-size: 48px; animation: rotateHint 2s ease-in-out infinite;
-}
-@keyframes rotateHint {
-  0%,100% { transform: rotate(0deg); }
-  50% { transform: rotate(90deg); }
-}
-.portrait-overlay .rotate-text {
-  font-size: 16px; font-weight: 800; letter-spacing: 1px;
-}
-@media (orientation: portrait) {
-  .portrait-overlay { display: flex; }
-}
 
 /* ── Loading ── */
 .loading-overlay {
@@ -359,10 +339,6 @@ body {
 </head>
 <body>
 
-<div class="portrait-overlay" id="portraitOverlay">
-  <span class="rotate-icon">&#x1F4F1;</span>
-  <span class="rotate-text">横向きにしてください</span>
-</div>
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
   <div class="loading-text">読み込み中...</div>
@@ -937,14 +913,9 @@ document.addEventListener('touchend', e => {
   if (Math.abs(diff) > 80) changeDate(diff > 0 ? -1 : 1);
 }, { passive: true });
 
-// ── 横向き専用 ──
+// ── 横向きロック（PWA時のみ有効） ──
 function setupLandscape() {
-  // PWA時: orientation lock
-  try {
-    if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('landscape').catch(() => {});
-    }
-  } catch(e) {}
+  try { screen.orientation.lock('landscape').catch(() => {}); } catch(e) {}
 }
 
 // ── 初期化 ──
