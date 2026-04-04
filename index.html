@@ -1267,6 +1267,36 @@ function renderGrid() {
         style += `;top:${h * ol.index}%;bottom:${100 - h * (ol.index + 1)}%`;
       }
 
+      // 分担がある場合、backgroundをグラデーションで色分け
+      if (res.subAssignments && Array.isArray(res.subAssignments) && res.subAssignments.length > 0 && type === 'treatment') {
+        const totalMin = eMin - sMin;
+        if (totalMin > 0) {
+          const segs = [];
+          res.subAssignments.forEach(sa => {
+            if (!sa.start || !sa.end) return;
+            const saStaff = staff.find(st => st.id === sa.staffId);
+            const [ssh, ssm] = String(sa.start).split(':').map(Number);
+            const [seh, sem] = String(sa.end).split(':').map(Number);
+            segs.push({
+              s: (ssh * 60 + ssm - sh * 60 - sm) / totalMin * 100,
+              e: (seh * 60 + sem - sh * 60 - sm) / totalMin * 100,
+              c: saStaff ? saStaff.color : color
+            });
+          });
+          segs.sort((a, b) => a.s - b.s);
+          const stops = [];
+          let prev = 0;
+          segs.forEach(sg => {
+            if (sg.s > prev) { stops.push(color + ' ' + prev + '%'); stops.push(color + ' ' + sg.s + '%'); }
+            stops.push(sg.c + ' ' + sg.s + '%');
+            stops.push(sg.c + ' ' + sg.e + '%');
+            prev = sg.e;
+          });
+          if (prev < 100) { stops.push(color + ' ' + prev + '%'); stops.push(color + ' 100%'); }
+          if (stops.length > 0) style += ';background:linear-gradient(to right,' + stops.join(',') + ')';
+        }
+      }
+
       // 予約枠（背景+文字、タップ可能）
       html += `<div class="${cls}" style="${style}" data-id="${res.id}" onclick="event.stopPropagation();openViewModal(dayReservations.find(r=>r.id==='${res.id}'))">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
