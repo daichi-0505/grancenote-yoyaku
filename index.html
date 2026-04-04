@@ -317,32 +317,30 @@ html.force-landscape {
   .modal { border-radius: 16px; max-width: 420px; }
 }
 
-/* スマホ（縦持ちでも強制横表示されるので、実質全てランドスケープ） */
-@media (max-height: 500px) {
-  .header { padding: 2px 10px; border-bottom-width: 1px; box-shadow: none; }
-  .header-date { font-size: 13px; letter-spacing: 0; }
-  .header-dow { font-size: 11px; }
-  .nav-btn { width: 24px; height: 24px; font-size: 12px; border-radius: 5px; }
-  .today-btn { padding: 2px 6px; font-size: 9px; border-radius: 5px; }
-  .settings-btn { padding: 2px 6px; font-size: 9px; }
-  .refresh-btn { padding: 2px 5px; font-size: 12px; }
-  .header-left { gap: 4px; }
-  .header-right { gap: 3px; }
-  .checklist-bar { display: none; }
-  .memo-space { display: none; }
-  .grid-wrapper { flex: 1; }
-  .grid-scroll { overflow-y: hidden; }
-  .room-row { height: auto; flex: 1; min-height: 0; }
-  .grid-table { height: 100%; }
-  .room-label { font-size: 9px; padding: 1px 2px; }
-  .room-sublabel { font-size: 7px; }
-  .time-header-row { height: 16px; }
-  .hour-block { font-size: 8px; padding-bottom: 1px; }
-  .reservation { top: 1px; bottom: 1px; padding: 1px 3px; }
-  .res-name { font-size: 9px; }
-  .res-menu-label { font-size: 7px; padding: 0 3px; }
-  .res-memo-tag { font-size: 7px; }
-  .res-top { gap: 2px; }
+/* モバイル共通（常に横表示なので統一スタイル） */
+@media (max-width: 1023px) {
+  .header { padding: 6px 12px; border-bottom-width: 1px; box-shadow: none; }
+  .header-date { font-size: 16px; }
+  .header-dow { font-size: 13px; }
+  .nav-btn { width: 30px; height: 30px; font-size: 15px; border-radius: 6px; }
+  .today-btn { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+  .settings-btn { padding: 4px 8px; font-size: 11px; }
+  .refresh-btn { padding: 4px 7px; font-size: 14px; }
+  .header-left { gap: 6px; }
+  .header-right { gap: 4px; }
+  .checklist-bar { padding: 4px 12px; gap: 12px; }
+  .check-item { font-size: 12px; }
+  .memo-space { height: 30px; }
+  .grid-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .room-row { height: 52px; }
+  .room-label { font-size: 12px; padding: 2px 4px; }
+  .room-sublabel { font-size: 9px; }
+  .time-header-row { height: 20px; }
+  .hour-block { font-size: 10px; }
+  .reservation { top: 2px; bottom: 2px; padding: 2px 4px; }
+  .res-name { font-size: 11px; }
+  .res-menu-label { font-size: 9px; }
+  .res-memo-tag { font-size: 8px; }
 }
 </style>
 </head>
