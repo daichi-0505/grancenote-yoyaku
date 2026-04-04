@@ -374,6 +374,13 @@ body {
 .practice-line {
   height: 4px; border-radius: 2px;
 }
+.reservation.type-block {
+  border: 2px solid #9CA3AF; background: repeating-linear-gradient(
+    -45deg, rgba(156,163,175,0.15), rgba(156,163,175,0.15) 4px,
+    transparent 4px, transparent 8px
+  ); border-radius: 4px;
+}
+.reservation.type-block .res-type-tag { color: #6B7280; background: rgba(156,163,175,0.2); }
 .reservation.type-shopping {
   border: 2px solid var(--res-color, #888);
   background: rgba(255,255,255,0.85);
@@ -675,6 +682,7 @@ body {
         <button class="type-btn" data-type="task">業務</button>
         <button class="type-btn" data-type="practice">練習</button>
         <button class="type-btn" data-type="shopping">🛒 買い物</button>
+        <button class="type-btn" data-type="block">🚫 ブロック</button>
       </div>
       <div id="treatmentFields">
         <div class="form-group"><label>お客様名</label><input type="text" id="resName" placeholder="山田 花子 様" autocomplete="off"></div>
@@ -687,6 +695,14 @@ body {
         </div>
         <div class="form-group"><label>参加スタッフ（複数選択可）</label>
           <div id="practiceStaffChecks" class="practice-staff-checks"></div>
+        </div>
+      </div>
+      <div id="blockFields" style="display:none">
+        <div class="form-group"><label>ブロック対象部屋（複数選択可）</label>
+          <div id="blockRoomChecks" class="practice-staff-checks"></div>
+        </div>
+        <div class="form-group"><label>関連スタッフ（複数選択可・任意）</label>
+          <div id="blockStaffChecks" class="practice-staff-checks"></div>
         </div>
       </div>
       <div id="singleStaffField" class="form-group"><label>担当スタッフ</label><select id="resStaff"></select></div>
@@ -966,6 +982,8 @@ async function syncDayDataFromApi() {
         aftercareStaffId: r.aftercare_staff_id || null,
         subAssignments: r.sub_assignments ? (typeof r.sub_assignments === 'string' ? JSON.parse(r.sub_assignments) : r.sub_assignments) : null,
         practiceStaffIds: r.practice_staff_ids ? (typeof r.practice_staff_ids === 'string' ? JSON.parse(r.practice_staff_ids) : r.practice_staff_ids) : null,
+        blockRoomIds: r.block_room_ids ? (typeof r.block_room_ids === 'string' ? JSON.parse(r.block_room_ids) : r.block_room_ids) : null,
+        blockStaffIds: r.block_staff_ids ? (typeof r.block_staff_ids === 'string' ? JSON.parse(r.block_staff_ids) : r.block_staff_ids) : null,
       }));
       const allRes = lsLoad('reservations', {});
       allRes[dk] = dayReservations;
@@ -1345,7 +1363,7 @@ function renderGrid() {
       html += `<div class="${cls}" style="left:${pct}%"></div>`;
     }
 
-    const rr = dayReservations.filter(r => r.roomId === room.id);
+    const rr = dayReservations.filter(r => r.roomId === room.id || (r.type === 'block' && r.blockRoomIds && r.blockRoomIds.includes(room.id)));
     // 重なり検出
     const overlaps = detectOverlaps(rr, bh);
     rr.forEach((res, ri) => {
@@ -1424,7 +1442,7 @@ function renderGrid() {
         if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       } else {
         html += `<span class="res-time-label">${res.start}〜</span>`;
-        if (type !== 'break' && type !== 'task') {
+        if (type !== 'break' && type !== 'task' && type !== 'block') {
           if (noStaff) {
             html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
           } else {
@@ -1443,8 +1461,8 @@ function renderGrid() {
         html += '</div>';
       }
       html += '<div class="res-bottom">';
-      if (type === 'break' || type === 'task') {
-        const typeLabels = { break: '休憩', task: '業務' };
+      if (type === 'break' || type === 'task' || type === 'block') {
+        const typeLabels = { break: '休憩', task: '業務', block: '🚫' };
         html += `<span class="res-type-tag">${typeLabels[type]}</span>`;
       }
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
@@ -1523,14 +1541,18 @@ function setType(type) {
   const isTreatment = type === 'treatment';
   const isShopping = type === 'shopping';
   const isPractice = type === 'practice';
+  const isBlock = type === 'block';
   document.getElementById('treatmentFields').style.display = (isTreatment || isShopping) ? '' : 'none';
   document.getElementById('practiceFields').style.display = isPractice ? '' : 'none';
-  document.getElementById('singleStaffField').style.display = isPractice ? 'none' : '';
+  document.getElementById('blockFields').style.display = isBlock ? '' : 'none';
+  document.getElementById('singleStaffField').style.display = (isPractice || isBlock) ? 'none' : '';
   document.getElementById('aftercareFields').style.display = isTreatment ? '' : 'none';
   document.getElementById('checkinField').style.display = isTreatment ? '' : 'none';
   document.getElementById('detailToggle').style.display = isTreatment ? '' : 'none';
+  // 部屋セレクトは通常非表示（ブロックは独自UIで選ぶ）
+  document.getElementById('resRoom').closest('.form-group').style.display = isBlock ? 'none' : '';
   // ラベル変更
-  const labelMap = { treatment: ['施術開始','施術終了'], break: ['開始','終了'], task: ['開始','終了'], practice: ['開始','終了'], shopping: ['開始','終了'] };
+  const labelMap = { treatment: ['施術開始','施術終了'], break: ['開始','終了'], task: ['開始','終了'], practice: ['開始','終了'], shopping: ['開始','終了'], block: ['ブロック開始','ブロック終了'] };
   document.getElementById('labelStart').textContent = labelMap[type][0];
   document.getElementById('labelEnd').textContent = labelMap[type][1];
   if (!isTreatment && !isShopping) {
@@ -1539,6 +1561,7 @@ function setType(type) {
     document.getElementById('resName').placeholder = '山田 花子 様';
   }
   if (isPractice) populatePracticeFields();
+  if (isBlock) populateBlockFields();
 }
 
 const PRACTICE_MENUS = ['フェイシャル', 'インディバ', 'コルギ', 'クロージング'];
@@ -1575,6 +1598,35 @@ function populatePracticeFields() {
     inp.addEventListener('change', () => {
       inp.closest('.practice-staff-check').classList.toggle('checked', inp.checked);
     });
+  });
+}
+
+function populateBlockFields() {
+  // 部屋チェックボックス
+  const roomEl = document.getElementById('blockRoomChecks');
+  const prevRooms = Array.from(roomEl.querySelectorAll('input:checked')).map(i => i.value);
+  roomEl.innerHTML = rooms.map(r => {
+    const checked = prevRooms.includes(r.id) ? 'checked' : '';
+    return `<label class="practice-staff-check${checked ? ' checked' : ''}">
+      <input type="checkbox" value="${r.id}" ${checked}> ${r.name}
+    </label>`;
+  }).join('');
+  roomEl.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => inp.closest('.practice-staff-check').classList.toggle('checked', inp.checked));
+  });
+  // スタッフチェックボックス
+  const staffEl = document.getElementById('blockStaffChecks');
+  const prevStaff = Array.from(staffEl.querySelectorAll('input:checked')).map(i => i.value);
+  staffEl.innerHTML = staff.map(s => {
+    const checked = prevStaff.includes(s.id) ? 'checked' : '';
+    return `<label class="practice-staff-check${checked ? ' checked' : ''}">
+      <input type="checkbox" value="${s.id}" ${checked}>
+      <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${s.color}"></span>
+      ${shortName(s)}
+    </label>`;
+  }).join('');
+  staffEl.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => inp.closest('.practice-staff-check').classList.toggle('checked', inp.checked));
   });
 }
 
@@ -1693,12 +1745,12 @@ function openAddModal(roomId, hour, mins, bh) {
 function openViewModal(res) {
   const s = res.staffId ? staff.find(st => st.id === res.staffId) : null;
   const type = res.type || 'treatment';
-  const typeLabels = { treatment: '施術', break: '休憩', task: '業務', practice: '練習', shopping: '買い物' };
+  const typeLabels = { treatment: '施術', break: '休憩', task: '業務', practice: '練習', shopping: '買い物', block: '🚫 ブロック' };
   const room = rooms.find(r => r.id === res.roomId);
   const acStaff = res.aftercareStaffId ? staff.find(st => st.id === res.aftercareStaffId) : s;
 
   let html = `<div class="modal-header" style="border-left-color:${s ? s.color : '#9CA3AF'}">
-    <span class="modal-title">${type === 'practice' ? '練習' : res.name}</span>
+    <span class="modal-title">${type === 'practice' ? '練習' : type === 'block' ? '🚫 ブロック' : res.name}</span>
     <button class="modal-close" onclick="closeModal('viewModal')">&times;</button>
   </div><div class="modal-body">`;
 
@@ -1712,7 +1764,16 @@ function openViewModal(res) {
   html += `${res.start} 〜 ${res.end}`;
   if (room) html += ` / ${room.name}`;
   html += `</div>`;
-  if (type === 'practice' && res.practiceStaffIds && res.practiceStaffIds.length > 0) {
+  if (type === 'block') {
+    if (res.blockRoomIds && res.blockRoomIds.length > 0) {
+      const roomNames = res.blockRoomIds.map(rid => { const rm = rooms.find(r => r.id === rid); return rm ? rm.name : '?'; });
+      html += `<div style="font-size:13px;padding:2px 0">対象部屋: <strong>${roomNames.join('、')}</strong></div>`;
+    }
+    if (res.blockStaffIds && res.blockStaffIds.length > 0) {
+      const staffNames = res.blockStaffIds.map(sid => { const ps = staff.find(st => st.id === sid); return ps ? ps.name : '?'; });
+      html += `<div style="font-size:13px;padding:2px 0">関連スタッフ: <strong>${staffNames.join('、')}</strong></div>`;
+    }
+  } else if (type === 'practice' && res.practiceStaffIds && res.practiceStaffIds.length > 0) {
     const names = res.practiceStaffIds.map(sid => { const ps = staff.find(st => st.id === sid); return ps ? ps.name : '?'; });
     html += `<div style="font-size:13px;padding:2px 0">参加: <strong>${names.join('、')}</strong></div>`;
   } else {
@@ -1843,15 +1904,20 @@ async function executeSearch() {
   const startDate = new Date(startStr + 'T00:00:00');
   const endDate = new Date(endStr + 'T00:00:00');
 
-  // Supabaseから対象期間の予約とシフトを各スタッフ分取得
+  // Supabaseから対象期間の予約・シフト・ブロックを取得
   const staffFilter = searchSelectedStaffs.map(id => `staff_id.eq.${id}`).join(',');
-  const [resData, shiftData] = await Promise.all([
+  const [resData, shiftData, blockData] = await Promise.all([
     sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&or=(${staffFilter})&select=date,start_time,end_time,type,staff_id`),
     sbGet('yoyaku_shifts', `date=gte.${startStr}&date=lte.${endStr}&or=(${staffFilter})`),
+    sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&type=eq.block&select=date,start_time,end_time,block_staff_ids`),
   ]);
 
   const reservations = resData || [];
   const shifts = shiftData || [];
+  const blocks = (blockData || []).map(b => ({
+    ...b,
+    block_staff_ids: b.block_staff_ids ? (typeof b.block_staff_ids === 'string' ? JSON.parse(b.block_staff_ids) : b.block_staff_ids) : []
+  }));
 
   const results = [];
   const d = new Date(startDate);
@@ -1891,8 +1957,14 @@ async function executeSearch() {
           const [sh, sm] = r.start_time.split(':').map(Number);
           const [eh, em] = r.end_time.split(':').map(Number);
           return { start: sh * 60 + sm, end: eh * 60 + em };
-        })
-        .sort((a, b) => a.start - b.start);
+        });
+      // ブロック時間帯も追加（このスタッフが紐づいている場合）
+      blocks.filter(b => b.date === dk && b.block_staff_ids.includes(sid)).forEach(b => {
+        const [sh, sm] = b.start_time.split(':').map(Number);
+        const [eh, em] = b.end_time.split(':').map(Number);
+        dayRes.push({ start: sh * 60 + sm, end: eh * 60 + em });
+      });
+      dayRes.sort((a, b) => a.start - b.start);
 
       // 空き枠算出
       const staffStartMin = staffStart * 60;
@@ -2044,6 +2116,22 @@ function openEditModal(res) {
   document.getElementById('resStaff').value = res.staffId || '';
   document.getElementById('resAftercareEnd').value = res.aftercareEnd || '';
   document.getElementById('resAftercareStaff').value = res.aftercareStaffId || '';
+  // ブロックの場合、部屋とスタッフを復元
+  if (type === 'block') {
+    populateBlockFields();
+    if (res.blockRoomIds) {
+      res.blockRoomIds.forEach(rid => {
+        const cb = document.querySelector(`#blockRoomChecks input[value="${rid}"]`);
+        if (cb) { cb.checked = true; cb.closest('.practice-staff-check').classList.add('checked'); }
+      });
+    }
+    if (res.blockStaffIds) {
+      res.blockStaffIds.forEach(sid => {
+        const cb = document.querySelector(`#blockStaffChecks input[value="${sid}"]`);
+        if (cb) { cb.checked = true; cb.closest('.practice-staff-check').classList.add('checked'); }
+      });
+    }
+  }
   // 練習の場合、メニューとスタッフを復元
   if (type === 'practice') {
     selectedPracticeMenu = '';
@@ -2081,10 +2169,15 @@ async function saveReservation() {
   const name = document.getElementById('resName').value.trim();
   const isTreatment = currentType === 'treatment' || currentType === 'shopping';
   const isPractice = currentType === 'practice';
+  const isBlock = currentType === 'block';
   if (isTreatment && !name) { alert('お客様名を入力してください'); return; }
   if (isPractice) {
     const checkedStaff = Array.from(document.querySelectorAll('#practiceStaffChecks input:checked'));
     if (checkedStaff.length === 0) { alert('参加スタッフを選択してください'); return; }
+  }
+  if (isBlock) {
+    const checkedRooms = Array.from(document.querySelectorAll('#blockRoomChecks input:checked'));
+    if (checkedRooms.length === 0) { alert('ブロック対象部屋を選択してください'); return; }
   }
   let menu = '';
   if (isTreatment) {
@@ -2095,15 +2188,21 @@ async function saveReservation() {
   const practiceStaffIds = isPractice
     ? Array.from(document.querySelectorAll('#practiceStaffChecks input:checked')).map(i => i.value)
     : null;
+  const blockRoomIds = isBlock
+    ? Array.from(document.querySelectorAll('#blockRoomChecks input:checked')).map(i => i.value)
+    : null;
+  const blockStaffIds = isBlock
+    ? Array.from(document.querySelectorAll('#blockStaffChecks input:checked')).map(i => i.value)
+    : null;
   const data = {
     id: editingRes ? editingRes.id : 'r' + Date.now(),
     date: dateKey(currentDate),
     name: name || currentType,
     menu: menu,
-    staffId: isPractice ? (practiceStaffIds[0] || '') : (document.getElementById('resStaff').value || ''),
+    staffId: isPractice ? (practiceStaffIds[0] || '') : isBlock ? '' : (document.getElementById('resStaff').value || ''),
     start: document.getElementById('resStart').value,
     end: document.getElementById('resEnd').value,
-    roomId: document.getElementById('resRoom').value,
+    roomId: isBlock ? (blockRoomIds[0] || '') : document.getElementById('resRoom').value,
     memo: document.getElementById('resMemo').value.trim(),
     type: currentType,
     checkedIn: document.getElementById('resCheckedIn').checked,
@@ -2111,7 +2210,28 @@ async function saveReservation() {
     aftercareStaffId: document.getElementById('resAftercareStaff').value || null,
     subAssignments: getSubAssignments(),
     practiceStaffIds: practiceStaffIds,
+    blockRoomIds: blockRoomIds,
+    blockStaffIds: blockStaffIds,
   };
+
+  // ブロックチェック（施術・買い物をブロック時間帯に入れようとしたら警告）
+  if (isTreatment && !isBlock) {
+    const [dsh, dsm] = data.start.split(':').map(Number);
+    const [deh, dem] = data.end.split(':').map(Number);
+    const dStartMin = dsh * 60 + dsm;
+    const dEndMin = deh * 60 + dem;
+    const blocked = dayReservations.find(r => {
+      if (r.type !== 'block') return false;
+      if (editingRes && r.id === editingRes.id) return false;
+      if (!r.blockRoomIds || !r.blockRoomIds.includes(data.roomId)) return false;
+      const [bsh, bsm] = r.start.split(':').map(Number);
+      const [beh, bem] = r.end.split(':').map(Number);
+      return dStartMin < beh * 60 + bem && dEndMin > bsh * 60 + bsm;
+    });
+    if (blocked) {
+      if (!confirm(`この時間帯はブロックされています（${blocked.start}〜${blocked.end}）。それでも登録しますか？`)) return;
+    }
+  }
 
   if (editingRes) {
     dayReservations = dayReservations.map(r => r.id === editingRes.id ? data : r);
@@ -2135,6 +2255,8 @@ async function saveReservation() {
     aftercare_staff_id: data.aftercareStaffId,
     sub_assignments: data.subAssignments || null,
     practice_staff_ids: data.practiceStaffIds || null,
+    block_room_ids: data.blockRoomIds || null,
+    block_staff_ids: data.blockStaffIds || null,
     updated_at: new Date().toISOString()
   });
 }
