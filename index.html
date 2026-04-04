@@ -373,7 +373,6 @@ body {
 </div>
 
 <div class="staff-status-bar" id="staffStatusBar"></div>
-<div class="checklist-bar" id="checklistBar"></div>
 <div class="memo-space"></div>
 <div class="grid-wrapper" id="gridWrapper"></div>
 
@@ -615,7 +614,6 @@ function renderGrid() {
   headerHtml += '<div class="time-header-cells">';
   for (let h = bh.start; h <= bh.end; h++) {
     const pct = (h - bh.start) / totalH * 100;
-    headerHtml += `<div style="position:absolute;left:${pct}%;top:0;bottom:0;border-left:1px solid ${h === bh.start || h === bh.end ? 'var(--accent)' : 'rgba(44,62,107,0.15)'};pointer-events:none"></div>`;
     headerHtml += `<div class="hour-block" style="left:${pct}%">${h}:00</div>`;
   }
   headerHtml += '</div></div>';
@@ -889,7 +887,6 @@ function goToDate(newDate) {
   dayReservations = [];
   dayCheckStates = {};
   renderHeader();
-  renderChecklist();
   renderGrid();
   // バックグラウンドでデータ取得→再描画
   loadDayData().then(() => { renderChecklist(); renderGrid(); });
@@ -962,7 +959,7 @@ function setupLandscape() {
 }
 
 // ── 初期化 ──
-function renderAll() { renderHeader(); renderStaffStatus(); renderChecklist(); renderGrid(); }
+function renderAll() { renderHeader(); renderStaffStatus(); renderGrid(); }
 
 async function init() {
   setupLandscape();
