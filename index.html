@@ -11,7 +11,7 @@
 <title>予約帳 - グランセノーテ</title>
 <style>
 :root {
-  --bg-primary:     #F5F6FA;
+  --bg-primary:     #FFFFFF;
   --bg-card:        #FFFFFF;
   --border-default: #E8EAF0;
   --border-focus:   #2C3E6B;
@@ -147,7 +147,7 @@ body {
 /* ── Grid ── */
 .grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 .grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.grid-table { display: flex; flex-direction: column; width: 100%; }
+.grid-table { display: flex; flex-direction: column; width: 100%; border: 2px solid var(--accent); border-radius: 4px; overflow: hidden; }
 
 /* Memo space */
 .memo-space {
@@ -620,7 +620,7 @@ function renderGrid() {
   headerHtml += '</div></div>';
 
   // Scrollable room rows
-  let html = '<div class="grid-table">';
+  let html = '<div class="grid-table">' + headerHtml;
   rooms.forEach(room => {
     const dc = room.divider ? ' section-divider' : '';
     html += `<div class="room-row${dc}">`;
@@ -671,7 +671,7 @@ function renderGrid() {
   });
 
   html += '</div>';
-  wrapper.innerHTML = headerHtml + '<div class="grid-scroll">' + html + '</div>';
+  wrapper.innerHTML = '<div class="grid-scroll">' + html + '</div>';
 
   // Events
   wrapper.querySelectorAll('.click-overlay').forEach(ov => {
