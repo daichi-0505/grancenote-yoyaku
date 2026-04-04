@@ -334,11 +334,14 @@ body {
 /* 種別スタイル */
 .reservation.type-treatment {
   border: 2px solid var(--res-color, #888);
-  background: rgba(255,255,255,0.85);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  background: var(--res-color, #888);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
 }
+.reservation.type-treatment .res-name { color: #fff; }
+.reservation.type-treatment .res-menu-label { background: rgba(255,255,255,0.3); color: #fff; }
+.reservation.type-treatment .res-memo-tag { background: rgba(255,255,255,0.4); color: rgba(0,0,0,0.6); }
 .reservation.type-treatment.checked-in {
-  background: var(--res-color-bg, rgba(0,0,0,0.08));
+  box-shadow: 0 1px 6px rgba(0,0,0,0.2);
 }
 .reservation.type-break {
   border: 2px dashed var(--res-color, #888);
@@ -1317,7 +1320,7 @@ function renderGrid() {
     el.addEventListener('click', e => {
       e.stopPropagation();
       const res = dayReservations.find(r => r.id === el.dataset.id);
-      if (res) openEditModal(res);
+      if (res) openViewModal(res);
     });
   });
 }
@@ -1456,6 +1459,79 @@ function openAddModal(roomId, hour, mins, bh) {
     <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
     <button class="btn btn-primary" onclick="saveReservation()">保存</button>`;
   document.getElementById('reservationModal').classList.add('active');
+}
+
+function openViewModal(res) {
+  const s = res.staffId ? staff.find(st => st.id === res.staffId) : null;
+  const type = res.type || 'treatment';
+  const typeLabels = { treatment: '施術', break: '休憩', task: '業務', shopping: '買い物' };
+  const room = rooms.find(r => r.id === res.roomId);
+  const acStaff = res.aftercareStaffId ? staff.find(st => st.id === res.aftercareStaffId) : s;
+
+  let html = `<div class="modal-header" style="border-left-color:${s ? s.color : '#9CA3AF'}">
+    <span class="modal-title">${res.name}</span>
+    <button class="modal-close" onclick="closeModal('viewModal')">&times;</button>
+  </div><div class="modal-body">`;
+
+  html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">`;
+  html += `<span style="font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-glow);padding:3px 8px;border-radius:6px">${typeLabels[type]}</span>`;
+  if (res.checkedIn) html += `<span style="font-size:12px;font-weight:800;color:var(--success);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:6px">✓ 来店済み</span>`;
+  html += `</div>`;
+
+  if (res.menu) html += `<div style="font-size:14px;font-weight:700;padding:2px 0">${res.menu}</div>`;
+  html += `<div style="font-size:13px;color:var(--text-secondary);padding:2px 0">`;
+  html += `${res.start} 〜 ${res.end}`;
+  if (room) html += ` / ${room.name}`;
+  html += `</div>`;
+  html += `<div style="font-size:13px;padding:2px 0">担当: <strong>${s ? s.name : '⚠ 未定'}</strong></div>`;
+
+  if (res.aftercareEnd) {
+    html += `<div style="font-size:13px;padding:2px 0;color:var(--text-secondary)">アフターケア: 〜${res.aftercareEnd}（${acStaff ? acStaff.name : '—'}）</div>`;
+  }
+  if (res.memo) html += `<div style="font-size:13px;padding:4px 0;color:var(--text-secondary)">メモ: ${res.memo}</div>`;
+  if (res.subAssignments && res.subAssignments.length > 0) {
+    html += `<div style="font-size:12px;padding:4px 0;color:var(--text-muted)">分担: `;
+    html += res.subAssignments.map(sa => {
+      const ss = staff.find(st => st.id === sa.staffId);
+      return `${ss ? ss.name : '?'} ${sa.start}〜${sa.end}`;
+    }).join(' / ');
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  html += `<div class="modal-footer">`;
+  if (!res.checkedIn) {
+    html += `<button class="btn btn-primary" style="background:var(--success)" onclick="quickCheckIn('${res.id}')">✓ 来店チェック</button>`;
+  }
+  html += `<button class="btn btn-cancel" onclick="closeModal('viewModal');openEditModal(dayReservations.find(r=>r.id==='${res.id}'))">編集</button>`;
+  html += `<button class="btn btn-danger" onclick="closeModal('viewModal');editingRes=dayReservations.find(r=>r.id==='${res.id}');deleteReservation()">削除</button>`;
+  html += `</div>`;
+
+  let modal = document.getElementById('viewModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'viewModal';
+    modal.innerHTML = '<div class="modal"></div>';
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('viewModal'); });
+    document.body.appendChild(modal);
+  }
+  modal.querySelector('.modal').innerHTML = html;
+  modal.classList.add('active');
+}
+
+async function quickCheckIn(resId) {
+  const res = dayReservations.find(r => r.id === resId);
+  if (!res) return;
+  res.checkedIn = true;
+  // localStorage
+  const allRes = lsLoad('reservations', {});
+  allRes[dateKey(currentDate)] = dayReservations;
+  lsSave('reservations', allRes);
+  // Supabase
+  sbUpsert('yoyaku_reservations', { id: resId, checked_in: true, updated_at: new Date().toISOString() });
+  closeModal('viewModal');
+  renderGrid();
 }
 
 function openEditModal(res) {
