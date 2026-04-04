@@ -1267,39 +1267,6 @@ function renderGrid() {
         style += `;top:${h * ol.index}%;bottom:${100 - h * (ol.index + 1)}%`;
       }
 
-      // 分担がある場合、backgroundをグラデーションに
-      try {
-        const subs = typeof res.subAssignments === 'string' ? JSON.parse(res.subAssignments) : res.subAssignments;
-        if (subs && Array.isArray(subs) && subs.length > 0 && type === 'treatment') {
-          const totalMin = eMin - sMin;
-          if (totalMin > 0) {
-            const stops = [];
-            // 全区間をスタッフ色で分割
-            const allSegments = [];
-            subs.forEach(sa => {
-              if (!sa.start || !sa.end) return;
-              const saStaff = staff.find(st => st.id === sa.staffId);
-              const [ssh, ssm] = String(sa.start).split(':').map(Number);
-              const [seh, sem] = String(sa.end).split(':').map(Number);
-              allSegments.push({
-                start: (ssh * 60 + ssm - sh * 60 - sm) / totalMin * 100,
-                end: (seh * 60 + sem - sh * 60 - sm) / totalMin * 100,
-                color: saStaff ? saStaff.color : color
-              });
-            });
-            allSegments.sort((a, b) => a.start - b.start);
-            let prev = 0;
-            allSegments.forEach(seg => {
-              if (seg.start > prev) stops.push(`${color} ${prev}%`, `${color} ${seg.start}%`);
-              stops.push(`${seg.color} ${seg.start}%`, `${seg.color} ${seg.end}%`);
-              prev = seg.end;
-            });
-            if (prev < 100) stops.push(`${color} ${prev}%`, `${color} 100%`);
-            if (stops.length > 0) style += `;background:linear-gradient(to right,${stops.join(',')})`;
-          }
-        }
-      } catch(e) {}
-
       // 予約枠（背景+文字、タップ可能）
       html += `<div class="${cls}" style="${style}" data-id="${res.id}" onclick="event.stopPropagation();openViewModal(dayReservations.find(r=>r.id==='${res.id}'))">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
