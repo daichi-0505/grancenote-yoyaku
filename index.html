@@ -107,7 +107,76 @@ body {
   cursor: pointer; letter-spacing: 1px; transition: all .15s; flex-shrink: 0;
 }
 .today-btn:active { background: var(--accent); color: #fff; }
+.header-tabs { display: flex; gap: 4px; flex: 1; justify-content: center; }
+.header-tab {
+  padding: 5px 12px; border: 1.5px solid var(--border-default); border-radius: 8px;
+  background: var(--bg-card); color: var(--text-muted); font-size: 12px; font-weight: 800;
+  cursor: pointer; letter-spacing: 0.5px; transition: all .15s; white-space: nowrap;
+}
+.header-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.header-tab:active { opacity: 0.8; }
 .header-right { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ── Calendar Page ── */
+.calendar-controls {
+  display: flex; align-items: center; gap: 10px; padding: 8px 16px;
+  border-bottom: 1px solid var(--border-default); flex-shrink: 0;
+}
+.calendar-month-label { font-size: 16px; font-weight: 900; color: var(--accent); min-width: 120px; text-align: center; }
+.calendar-staff-filter {
+  margin-left: auto; padding: 5px 10px; border: 1.5px solid var(--border-default);
+  border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--bg-card); color: var(--text-primary);
+}
+.calendar-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 1px; background: var(--border-default); flex: 1; overflow-y: auto;
+  padding-bottom: var(--safe-bottom);
+}
+.cal-header {
+  background: var(--bg-card); padding: 4px; text-align: center;
+  font-size: 11px; font-weight: 800; color: var(--text-secondary);
+  position: sticky; top: 0; z-index: 1;
+}
+.cal-header.sun { color: var(--danger); }
+.cal-header.sat { color: var(--accent-light); }
+.cal-cell {
+  background: var(--bg-card); padding: 3px 4px; min-height: 60px;
+  cursor: pointer; transition: background .1s; position: relative;
+}
+.cal-cell:active { background: var(--accent-glow); }
+.cal-cell.other-month { opacity: 0.3; }
+.cal-cell.today { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-cell.closed { background: #F9FAFB; }
+.cal-day { font-size: 11px; font-weight: 800; margin-bottom: 2px; }
+.cal-day.sun { color: var(--danger); }
+.cal-day.sat { color: var(--accent-light); }
+.cal-dots { display: flex; flex-wrap: wrap; gap: 2px; }
+.cal-dot {
+  width: 18px; height: 5px; border-radius: 2px; font-size: 0;
+}
+.cal-name {
+  font-size: 8px; font-weight: 700; color: #fff; line-height: 1;
+  padding: 1px 2px; border-radius: 2px; white-space: nowrap; overflow: hidden;
+}
+
+/* ── Notification Page ── */
+.notif-section { padding: 12px 16px; }
+.notif-title { font-size: 14px; font-weight: 900; color: var(--accent); margin-bottom: 8px; letter-spacing: 1px; }
+.notif-list { display: flex; flex-direction: column; gap: 6px; }
+.notif-empty { font-size: 13px; color: var(--text-muted); padding: 12px; text-align: center; }
+.notif-item {
+  padding: 10px 12px; border: 1.5px solid var(--border-default); border-radius: 10px;
+  background: var(--bg-card); display: flex; align-items: center; gap: 10px;
+}
+.notif-icon { font-size: 18px; flex-shrink: 0; }
+.notif-text { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.notif-badge {
+  background: var(--danger); color: #fff; font-size: 10px; font-weight: 800;
+  padding: 1px 5px; border-radius: 10px; position: absolute; top: -2px; right: -2px;
+}
+
+/* Page content */
+.page-content { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 .settings-btn {
   padding: 6px 12px; border: 1.5px solid var(--border-default); border-radius: 10px;
   background: var(--bg-card); color: var(--text-primary); font-size: 13px; font-weight: 700;
@@ -404,17 +473,50 @@ body {
       <input type="date" id="datePicker" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;-webkit-appearance:none">
     </div>
     <button class="nav-btn" id="nextDay">&#8250;</button>
-    <button class="today-btn" id="todayBtn">今日</button>
+    <button class="today-btn" id="todayBtn">今日にもどる</button>
+  </div>
+  <div class="header-tabs">
+    <button class="header-tab active" data-page="schedule">予約表</button>
+    <button class="header-tab" data-page="calendar">勤務カレンダー</button>
+    <button class="header-tab" data-page="notifications">&#9993; 通知</button>
   </div>
   <div class="header-right">
     <button class="refresh-btn" id="refreshBtn" title="再読込">&#x21bb;</button>
-    <button class="settings-btn" id="settingsBtn">&#9881; 設定</button>
+    <button class="settings-btn" id="settingsBtn">&#9881;</button>
   </div>
 </div>
 
-<div class="staff-status-bar" id="staffStatusBar"></div>
-<div class="shift-area" id="shiftArea"></div>
-<div class="grid-wrapper" id="gridWrapper"></div>
+<!-- 予約表ページ -->
+<div class="page-content" id="page-schedule">
+  <div class="staff-status-bar" id="staffStatusBar"></div>
+  <div class="shift-area" id="shiftArea"></div>
+  <div class="grid-wrapper" id="gridWrapper"></div>
+</div>
+
+<!-- 勤務カレンダーページ -->
+<div class="page-content" id="page-calendar" style="display:none">
+  <div class="calendar-controls">
+    <button class="nav-btn" id="calPrev">&#8249;</button>
+    <span class="calendar-month-label" id="calMonthLabel"></span>
+    <button class="nav-btn" id="calNext">&#8250;</button>
+    <select class="calendar-staff-filter" id="calStaffFilter">
+      <option value="all">全スタッフ</option>
+    </select>
+  </div>
+  <div class="calendar-grid" id="calendarGrid"></div>
+</div>
+
+<!-- 通知ページ -->
+<div class="page-content" id="page-notifications" style="display:none">
+  <div class="notif-section">
+    <h3 class="notif-title">本日の注意事項</h3>
+    <div id="notifReminders" class="notif-list"><div class="notif-empty">通知はありません</div></div>
+  </div>
+  <div class="notif-section">
+    <h3 class="notif-title">未完了タスク</h3>
+    <div id="notifTasks" class="notif-list"><div class="notif-empty">すべて完了しています</div></div>
+  </div>
+</div>
 
 <!-- Reservation Modal -->
 <div class="modal-overlay" id="reservationModal">
@@ -1318,6 +1420,203 @@ function setupLandscape() {
   }
   checkOrientation();
   window.addEventListener('resize', checkOrientation);
+}
+
+// ── タブ切り替え ──
+let currentPage = 'schedule';
+document.querySelectorAll('.header-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.header-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const page = tab.dataset.page;
+    currentPage = page;
+    document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+    document.getElementById('page-' + page).style.display = 'flex';
+    if (page === 'calendar') renderCalendar();
+    if (page === 'notifications') renderNotifications();
+  });
+});
+
+// ── 勤務カレンダー ──
+let calMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+let calStaffFilter = 'all';
+
+document.getElementById('calPrev').addEventListener('click', () => {
+  calMonth.setMonth(calMonth.getMonth() - 1);
+  renderCalendar();
+});
+document.getElementById('calNext').addEventListener('click', () => {
+  calMonth.setMonth(calMonth.getMonth() + 1);
+  renderCalendar();
+});
+document.getElementById('calStaffFilter').addEventListener('change', e => {
+  calStaffFilter = e.target.value;
+  renderCalendar();
+});
+
+// 月間シフトデータのキャッシュ
+let calShiftsCache = {};
+
+async function loadMonthShifts(year, month) {
+  const key = `${year}-${String(month+1).padStart(2,'0')}`;
+  // 月初〜月末
+  const firstDay = `${key}-01`;
+  const lastDay = new Date(year, month + 1, 0);
+  const lastDayStr = `${key}-${String(lastDay.getDate()).padStart(2,'0')}`;
+  const data = await sbGet('yoyaku_shifts', `date=gte.${firstDay}&date=lte.${lastDayStr}`);
+  if (data) {
+    const shifts = data.map(s => ({
+      id: s.id, staffId: s.staff_id, date: s.date,
+      start: s.start_time, end: s.end_time, isOff: s.is_off
+    }));
+    calShiftsCache[key] = shifts;
+    return shifts;
+  }
+  return calShiftsCache[key] || [];
+}
+
+function getStaffShiftForCal(staffId, date, monthShifts) {
+  const dk = dateKey(date);
+  const shift = monthShifts.find(s => s.staffId === staffId && s.date === dk);
+  if (shift) {
+    if (shift.isOff) return null;
+    return { start: parseFloat(shift.start), end: parseFloat(shift.end) };
+  }
+  // フォールバック: デフォルトシフト
+  const dow = date.getDay();
+  const bh = getBH(date);
+  if (!bh) return null;
+  switch (staffId) {
+    case 's1': case 's9': case 's4': return { start: bh.start, end: bh.end };
+    case 's2': return { start: bh.start, end: 17 };
+    case 's3': return { start: bh.start, end: 13 };
+    case 's5': return dow === 6 ? { start: bh.start, end: bh.end } : null;
+    default: return { start: bh.start, end: bh.end };
+  }
+}
+
+async function renderCalendar() {
+  const year = calMonth.getFullYear();
+  const month = calMonth.getMonth();
+  document.getElementById('calMonthLabel').textContent = `${year}年${month+1}月`;
+
+  // スタッフフィルター更新
+  const sel = document.getElementById('calStaffFilter');
+  const curVal = sel.value;
+  sel.innerHTML = '<option value="all">全スタッフ</option>';
+  staff.forEach(s => {
+    sel.innerHTML += `<option value="${s.id}" ${curVal===s.id?'selected':''}>${s.name}</option>`;
+  });
+  if (curVal && curVal !== 'all') sel.value = curVal;
+  calStaffFilter = sel.value;
+
+  // シフトデータを取得
+  const monthShifts = await loadMonthShifts(year, month);
+
+  const grid = document.getElementById('calendarGrid');
+  let html = '';
+  // 曜日ヘッダー
+  const dowLabels = ['日','月','火','水','木','金','土'];
+  dowLabels.forEach((d, i) => {
+    html += `<div class="cal-header ${i===0?'sun':''} ${i===6?'sat':''}">${d}</div>`;
+  });
+
+  // 月の日付を生成
+  const firstDate = new Date(year, month, 1);
+  const startDow = firstDate.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // 前月の末尾
+  for (let i = 0; i < startDow; i++) {
+    const d = new Date(year, month, -(startDow - 1 - i));
+    html += renderCalCell(d, monthShifts, true);
+  }
+  // 当月
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(year, month, day);
+    html += renderCalCell(d, monthShifts, false);
+  }
+  // 翌月の頭（6行埋め）
+  const totalCells = startDow + daysInMonth;
+  const remaining = (7 - totalCells % 7) % 7;
+  for (let i = 1; i <= remaining; i++) {
+    const d = new Date(year, month + 1, i);
+    html += renderCalCell(d, monthShifts, true);
+  }
+
+  grid.innerHTML = html;
+
+  // セルクリックイベント
+  grid.querySelectorAll('.cal-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const d = new Date(cell.dataset.date + 'T00:00:00');
+      // 予約表に切り替えてその日に移動
+      goToDate(d);
+      document.querySelectorAll('.header-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector('[data-page="schedule"]').classList.add('active');
+      document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+      document.getElementById('page-schedule').style.display = 'flex';
+      currentPage = 'schedule';
+    });
+  });
+}
+
+function renderCalCell(date, monthShifts, isOther) {
+  const dk = dateKey(date);
+  const dow = date.getDay();
+  const bh = getBH(date);
+  const isToday = dk === dateKey(new Date());
+  const isClosed = !bh;
+
+  let cls = 'cal-cell';
+  if (isOther) cls += ' other-month';
+  if (isToday) cls += ' today';
+  if (isClosed) cls += ' closed';
+
+  let html = `<div class="${cls}" data-date="${dk}">`;
+  html += `<div class="cal-day ${dow===0?'sun':''} ${dow===6?'sat':''}">${date.getDate()}</div>`;
+
+  if (!isClosed) {
+    const showStaff = calStaffFilter === 'all' ? staff : staff.filter(s => s.id === calStaffFilter);
+    html += `<div class="cal-dots">`;
+    showStaff.forEach(s => {
+      const shift = getStaffShiftForCal(s.id, date, monthShifts);
+      if (shift) {
+        html += `<div class="cal-name" style="background:${s.color}">${s.name.split(' ')[0]}</div>`;
+      }
+    });
+    html += `</div>`;
+  } else {
+    html += `<div style="font-size:9px;color:var(--text-muted)">休</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+// ── 通知ページ ──
+async function renderNotifications() {
+  const today = dateKey(new Date());
+  // チェックリストの未完了を表示
+  const taskDiv = document.getElementById('notifTasks');
+  const unchecked = checks.filter(c => !dayCheckStates[c.id]);
+  if (unchecked.length > 0) {
+    taskDiv.innerHTML = unchecked.map(c =>
+      `<div class="notif-item"><span class="notif-icon">&#9744;</span><span class="notif-text">${c.label}</span></div>`
+    ).join('');
+  } else {
+    taskDiv.innerHTML = '<div class="notif-empty">すべて完了しています</div>';
+  }
+
+  // 当日の予約からリマインドを表示
+  const reminderDiv = document.getElementById('notifReminders');
+  const todayRes = dayReservations.filter(r => r.memo && r.memo.trim());
+  if (todayRes.length > 0) {
+    reminderDiv.innerHTML = todayRes.map(r =>
+      `<div class="notif-item"><span class="notif-icon">&#128276;</span><span class="notif-text"><strong>${r.name}</strong>（${r.start}〜）: ${r.memo}</span></div>`
+    ).join('');
+  } else {
+    reminderDiv.innerHTML = '<div class="notif-empty">本日のリマインドはありません</div>';
+  }
 }
 
 // ── 初期化 ──
