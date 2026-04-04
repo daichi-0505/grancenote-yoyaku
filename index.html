@@ -1308,9 +1308,8 @@ function renderGrid() {
       }
       html += '</div>';
       html += '<div class="res-bottom">';
-      if (type !== 'treatment' && type !== 'shopping') {
-        const typeLabels = { break: '休憩', task: '業務', shopping: '🛒' };
-        html += `<span class="res-type-tag">${typeLabels[type] || type}</span>`;
+      if (type === 'shopping') {
+        html += `<span class="res-type-tag">🛒</span>`;
       }
       if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
