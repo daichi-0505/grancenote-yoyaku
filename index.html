@@ -1024,6 +1024,8 @@ async function init() {
   await loadDayData();
   renderAll();
   document.getElementById('loadingOverlay').classList.add('hidden');
+  // ブラウザのレイアウト確定後にもう一度描画（初回の幅ズレ対策）
+  requestAnimationFrame(() => { setTimeout(() => renderAll(), 50); });
 }
 
 init();
