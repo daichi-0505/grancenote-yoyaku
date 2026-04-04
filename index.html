@@ -270,6 +270,12 @@ body {
   .staff-status-label { font-size: 12px; }
   .shift-bar-row { height: 22px; }
   .shift-line { top: 3px; height: 16px; font-size: 9px; padding-left: 6px; }
+  /* iPad: 練習・業務・休憩の線と文字を少し太く */
+  .practice-line { height: 8px; border-radius: 3px; }
+  .practice-lines { gap: 3px; }
+  .reservation.type-task { border-bottom-width: 8px; }
+  .reservation.type-break { border-bottom-width: 7px; }
+  .res-type-tag { font-size: 14px; padding: 1px 6px; }
 }
 
 /* Time header（枠の外） */
@@ -553,6 +559,12 @@ body {
   .res-menu-label { font-size: 11px; }
   .modal-overlay { align-items: center; padding: 16px; }
   .modal { border-radius: 16px; max-width: 420px; }
+  /* PC: 練習・業務・休憩の線と文字を太く */
+  .practice-line { height: 12px; border-radius: 4px; }
+  .practice-lines { gap: 4px; }
+  .reservation.type-task { border-bottom-width: 12px; }
+  .reservation.type-break { border-bottom-width: 10px; }
+  .res-type-tag { font-size: 16px; padding: 2px 8px; }
 }
 
 /* viewport 800px固定なのでメディアクエリ不要 — デフォルトが横表示 */
