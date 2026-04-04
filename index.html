@@ -415,6 +415,7 @@ body {
 .detail-toggle.open .arrow { transform: rotate(90deg); }
 .detail-section { display: none; padding: 8px 0; }
 .detail-section.open { display: block; }
+.sub-block { z-index: 3; pointer-events: none; border-radius: 5px; opacity: 0.95; }
 .sub-assignment {
   display: flex; align-items: center; gap: 6px; padding: 4px 0;
   border-bottom: 1px solid var(--border-default);
@@ -1269,32 +1270,6 @@ function renderGrid() {
         style += `;top:${h * ol.index}%;bottom:${100 - h * (ol.index + 1)}%`;
       }
 
-      // 分担がある場合、背景をグラデーションで色分け
-      try {
-        const subs = typeof res.subAssignments === 'string' ? JSON.parse(res.subAssignments) : res.subAssignments;
-        if (subs && Array.isArray(subs) && subs.length > 0 && type === 'treatment') {
-          const totalMin = eMin - sMin;
-          if (totalMin > 0) {
-            const stops = [];
-            let prevPct = 0;
-            subs.forEach(sa => {
-              if (!sa.start || !sa.end) return;
-              const saStaff = staff.find(st => st.id === sa.staffId);
-              const saColor = saStaff ? saStaff.color : '#9CA3AF';
-              const [ssh, ssm] = String(sa.start).split(':').map(Number);
-              const [seh, sem] = String(sa.end).split(':').map(Number);
-              const saStart = Math.max(0, ((ssh - bh.start) * 60 + ssm - sMin) / totalMin * 100);
-              const saEnd = Math.min(100, ((seh - bh.start) * 60 + sem - sMin) / totalMin * 100);
-              if (saStart > prevPct) stops.push(`${color} ${prevPct}%, ${color} ${saStart}%`);
-              stops.push(`${saColor} ${saStart}%, ${saColor} ${saEnd}%`);
-              prevPct = saEnd;
-            });
-            if (prevPct < 100) stops.push(`${color} ${prevPct}%, ${color} 100%`);
-            if (stops.length > 0) style += `;background:linear-gradient(to right,${stops.join(',')})`;
-          }
-        }
-      } catch(e) { console.warn('subAssignment render error', e); }
-
       html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
@@ -1324,6 +1299,22 @@ function renderGrid() {
         const acWidth = Math.max((acMin - eMin) / tMin * 100, 0.5);
         html += `<div class="aftercare-line" style="left:${acLeft}%;width:${acWidth}%;background:${acColor}"></div>`;
       }
+      // 分担: 別スタッフの担当区間を上から重ねる
+      try {
+        const subs = typeof res.subAssignments === 'string' ? JSON.parse(res.subAssignments) : res.subAssignments;
+        if (subs && Array.isArray(subs) && subs.length > 0) {
+          subs.forEach(sa => {
+            if (!sa.start || !sa.end || sa.staffId === res.staffId) return;
+            const saStaff = staff.find(st => st.id === sa.staffId);
+            if (!saStaff) return;
+            const [ssh, ssm] = String(sa.start).split(':').map(Number);
+            const [seh, sem] = String(sa.end).split(':').map(Number);
+            const saLeft = ((ssh - bh.start) * 60 + ssm) / tMin * 100;
+            const saWidth = Math.max(((seh - bh.start) * 60 + sem - (ssh - bh.start) * 60 - ssm) / tMin * 100, 1);
+            html += `<div class="reservation type-treatment sub-block" style="left:${saLeft}%;width:${saWidth}%;--res-color:${saStaff.color};background:${saStaff.color}" data-id="${res.id}"></div>`;
+          });
+        }
+      } catch(e) {}
     });
 
     const now = new Date();
