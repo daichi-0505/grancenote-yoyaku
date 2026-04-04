@@ -1777,7 +1777,7 @@ function openSearchModal() {
   const toEl = document.getElementById('searchDateTo');
   if (!fromEl.value) {
     fromEl.value = dateKey(new Date());
-    const def = new Date(); def.setDate(def.getDate() + 60);
+    const def = new Date(); def.setDate(def.getDate() + 30);
     toEl.value = dateKey(def);
   }
 
