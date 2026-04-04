@@ -719,32 +719,53 @@ function renderStaffStatus() {
   else bar.classList.remove('open');
 }
 
-function openStaffModal(s) {
-  const bh = getBH(currentDate);
-  const shift = getStaffShift(s.id, currentDate);
-  const dow = DOW[currentDate.getDay()];
+function openStaffModal(s, targetDate) {
+  const date = targetDate || currentDate;
+  const bh = getBH(date);
+  const shift = getStaffShift(s.id, date);
+  const dow = DOW[date.getDay()];
+  const dk = dateKey(date);
   let html = `<div class="modal-header" style="border-left-color:${s.color}">
     <span class="modal-title">${s.name}</span>
     <button class="modal-close" onclick="closeModal('staffModal')">&times;</button>
   </div><div class="modal-body">`;
-  html += `<div class="form-group"><label>役職</label><div style="font-size:15px;font-weight:700;padding:8px 0">${s.role || '—'}</div></div>`;
-  html += `<div class="form-group"><label>本日の勤務（${currentDate.getMonth()+1}/${currentDate.getDate()} ${dow}）</label>`;
-  if (shift) {
-    html += `<div style="font-size:15px;font-weight:700;padding:8px 0;color:var(--success)">${shift.start}:00 〜 ${shift.end}:00</div>`;
+
+  // 本日のシフト編集
+  html += `<div class="form-group"><label>シフト（${date.getMonth()+1}/${date.getDate()} ${dow}）</label>`;
+  if (!bh) {
+    html += `<div style="font-size:14px;color:var(--text-muted);padding:8px 0">定休日</div>`;
   } else {
-    html += `<div style="font-size:15px;font-weight:700;padding:8px 0;color:var(--text-muted)">休み</div>`;
+    // 時間選択肢を生成
+    const timeOpts = [];
+    for (let h = 8; h <= 20; h++) timeOpts.push(`${h}:00`);
+    const startVal = shift ? `${shift.start}:00` : `${bh.start}:00`;
+    const endVal = shift ? `${shift.end}:00` : `${bh.end}:00`;
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0">`;
+    html += `<select id="shiftStart" style="font-size:14px;padding:6px;border:1.5px solid var(--border-default);border-radius:8px">`;
+    timeOpts.forEach(t => { html += `<option value="${t}" ${t===startVal?'selected':''}>${t}</option>`; });
+    html += `</select><span>〜</span>`;
+    html += `<select id="shiftEnd" style="font-size:14px;padding:6px;border:1.5px solid var(--border-default);border-radius:8px">`;
+    timeOpts.forEach(t => { html += `<option value="${t}" ${t===endVal?'selected':''}>${t}</option>`; });
+    html += `</select></div>`;
+    html += `<div style="display:flex;gap:8px;padding:6px 0">`;
+    html += `<button class="btn btn-primary" style="font-size:13px;padding:6px 14px" onclick="saveShift('${s.id}','${dk}')">${shift ? '更新' : '出勤を登録'}</button>`;
+    if (shift) {
+      html += `<button class="btn btn-danger" style="font-size:13px;padding:6px 14px" onclick="deleteShift('${s.id}','${dk}')">休みにする</button>`;
+    }
+    html += `</div>`;
   }
   html += `</div>`;
+
   // 今週の勤務予定
   html += `<div class="form-group"><label>今週の勤務予定</label><div style="padding:4px 0">`;
-  const weekStart = new Date(currentDate);
+  const weekStart = new Date(date);
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart); d.setDate(d.getDate() + i);
     const sh = getStaffShift(s.id, d);
     const bh2 = getBH(d);
-    const isToday = dateKey(d) === dateKey(currentDate);
-    html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;${isToday ? 'font-weight:900;' : ''}">`;
+    const isToday = dateKey(d) === dk;
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;${isToday ? 'font-weight:900;' : ''}cursor:pointer" onclick="openStaffModal(staff.find(x=>x.id==='${s.id}'),new Date('${dateKey(d)}T00:00:00'))">`;
     html += `<span style="width:30px;font-size:12px;color:${d.getDay()===0?'var(--danger)':d.getDay()===6?'var(--accent-light)':'var(--text-secondary)'}">${DOW[d.getDay()]}</span>`;
     html += `<span style="font-size:12px;width:40px">${d.getMonth()+1}/${d.getDate()}</span>`;
     if (!bh2) {
@@ -757,6 +778,14 @@ function openStaffModal(s) {
     html += `</div>`;
   }
   html += `</div></div>`;
+
+  // 別の日にシフトを移動
+  html += `<div class="form-group"><label>別の日に移動</label>`;
+  html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0">`;
+  html += `<input type="date" id="shiftMoveDate" style="font-size:14px;padding:6px;border:1.5px solid var(--border-default);border-radius:8px" value="${dk}">`;
+  html += `<button class="btn btn-primary" style="font-size:13px;padding:6px 14px" onclick="moveShift('${s.id}','${dk}')">移動</button>`;
+  html += `</div></div>`;
+
   html += `</div>`;
 
   let modal = document.getElementById('staffModal');
@@ -770,6 +799,91 @@ function openStaffModal(s) {
   }
   modal.querySelector('.modal').innerHTML = html;
   modal.classList.add('active');
+}
+
+// ── シフトCRUD ──
+async function saveShift(staffId, date) {
+  const startEl = document.getElementById('shiftStart');
+  const endEl = document.getElementById('shiftEnd');
+  if (!startEl || !endEl) return;
+  const startTime = startEl.value;
+  const endTime = endEl.value;
+  if (parseInt(startTime) >= parseInt(endTime)) { alert('終了時間は開始時間より後にしてください'); return; }
+
+  if (!confirm(`${staff.find(s=>s.id===staffId).name} のシフトを ${startTime}〜${endTime} に設定しますか？`)) return;
+
+  // 既存シフトを探す
+  const existing = dayShifts.find(s => s.staffId === staffId && s.date === date);
+  const shiftId = existing ? existing.id : 'sh' + Date.now();
+
+  // localStorageに即反映
+  const shiftObj = { id: shiftId, staffId, date, start: startTime.split(':')[0], end: endTime.split(':')[0] };
+  dayShifts = dayShifts.filter(s => !(s.staffId === staffId && s.date === date));
+  dayShifts.push(shiftObj);
+  const allShifts = lsLoad('shifts', {});
+  allShifts[date] = dayShifts;
+  lsSave('shifts', allShifts);
+
+  // Supabaseに保存
+  await sbUpsert('yoyaku_shifts', {
+    id: shiftId, staff_id: staffId, date, start_time: startTime, end_time: endTime, updated_at: new Date().toISOString()
+  });
+
+  closeModal('staffModal');
+  renderAll();
+}
+
+async function deleteShift(staffId, date) {
+  const s = staff.find(x => x.id === staffId);
+  if (!confirm(`${s.name} のシフトを削除して休みにしますか？`)) return;
+
+  // 既存シフトを探す
+  const existing = dayShifts.find(sh => sh.staffId === staffId && sh.date === date);
+  dayShifts = dayShifts.filter(sh => !(sh.staffId === staffId && sh.date === date));
+  const allShifts = lsLoad('shifts', {});
+  allShifts[date] = dayShifts;
+  lsSave('shifts', allShifts);
+
+  if (existing) {
+    await sbDelete('yoyaku_shifts', `id=eq.${existing.id}`);
+  }
+
+  closeModal('staffModal');
+  renderAll();
+}
+
+async function moveShift(staffId, fromDate) {
+  const toDateEl = document.getElementById('shiftMoveDate');
+  if (!toDateEl) return;
+  const toDate = toDateEl.value;
+  if (toDate === fromDate) { alert('同じ日です'); return; }
+
+  const s = staff.find(x => x.id === staffId);
+  const shift = getStaffShift(staffId, new Date(fromDate + 'T00:00:00'));
+  if (!shift) { alert('移動元にシフトがありません'); return; }
+
+  if (!confirm(`${s.name} のシフトを ${fromDate} → ${toDate} に移動しますか？`)) return;
+
+  // 元のシフトを削除
+  const existing = dayShifts.find(sh => sh.staffId === staffId && sh.date === fromDate);
+  dayShifts = dayShifts.filter(sh => !(sh.staffId === staffId && sh.date === fromDate));
+  const allShifts = lsLoad('shifts', {});
+  allShifts[fromDate] = dayShifts;
+  lsSave('shifts', allShifts);
+  if (existing) {
+    await sbDelete('yoyaku_shifts', `id=eq.${existing.id}`);
+  }
+
+  // 新しい日にシフトを作成
+  const newId = 'sh' + Date.now();
+  await sbUpsert('yoyaku_shifts', {
+    id: newId, staff_id: staffId, date: toDate,
+    start_time: `${shift.start}:00`, end_time: `${shift.end}:00`,
+    updated_at: new Date().toISOString()
+  });
+
+  closeModal('staffModal');
+  renderAll();
 }
 
 function renderShiftBars() {
@@ -787,7 +901,7 @@ function renderShiftBars() {
     html += `<div class="shift-bar-cells">`;
     const left = (shift.start - bh.start) / totalH * 100;
     const width = (shift.end - shift.start) / totalH * 100;
-    html += `<div class="shift-line" style="left:${left}%;width:${width}%;background:${s.color}">${s.name.split(' ')[0]} ${shift.start}:00-${shift.end}:00</div>`;
+    html += `<div class="shift-line" style="left:${left}%;width:${width}%;background:${s.color};cursor:pointer" onclick="openStaffModal(staff.find(x=>x.id==='${s.id}'))">${s.name.split(' ')[0]} ${shift.start}:00-${shift.end}:00</div>`;
     html += `</div></div>`;
   });
   area.innerHTML = html;
