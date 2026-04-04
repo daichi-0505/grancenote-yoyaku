@@ -1948,48 +1948,61 @@ async function executeSearch() {
     return;
   }
 
-  // 全スタッフの空き枠をマージ（重複除外）
-  const mergedLines = []; // { date, slot, dk }
-  const seen = new Set();
+  // 全スタッフの空き枠をマージ（日別にまとめ、重複除外）
+  const dayMap = []; // [{ date, dk, slots[] }]
   results.forEach(r => {
-    // 全スタッフの空きスロット(分単位)を集めてユニーク化
     const allSlots = new Set();
-    r.staffSlots.forEach(ss => {
-      ss.slots.forEach(slot => allSlots.add(slot));
-    });
-    Array.from(allSlots).sort().forEach(slot => {
-      const key = `${r.date} ${slot}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        mergedLines.push({ date: r.date, slot, dk: r.dk });
-      }
-    });
+    r.staffSlots.forEach(ss => ss.slots.forEach(slot => allSlots.add(slot)));
+    const sorted = Array.from(allSlots).sort();
+    if (sorted.length > 0) {
+      dayMap.push({ date: r.date, dk: r.dk, slots: sorted });
+    }
   });
 
-  // コピー用テキスト生成
-  const copyLines = mergedLines.map(l => `・${l.date} ${l.slot}`);
-  const copyText = `【ご案内可能日時】\n${copyLines.join('\n')}\n\nご都合いかがでしょうか☺️`;
+  // 時刻を「○時」「○時○分」形式に変換
+  function formatTimeJP(slot) {
+    // "9:00〜" → "9時", "10:30〜16:30開始" → "10時30分〜16時30分開始"
+    return slot.replace(/(\d+):(\d+)/g, (_, h, m) => {
+      return m === '00' ? `${parseInt(h)}時` : `${parseInt(h)}時${parseInt(m)}分`;
+    });
+  }
+
+  // コピー用テキスト生成（同じ日のスロットは/で繋ぐ）
+  const copyLines = dayMap.map(d => {
+    const slotsJP = d.slots.map(s => formatTimeJP(s));
+    return `${d.date} ${slotsJP.join('/')}`;
+  });
+  const copyText = `日程を確認いたしましたところ、下記のお日にちでご案内が可能でございます🙌\n\n【ご案内可能日時】\n\n${copyLines.join('  \n')}\n\n上記の日時で、ご都合のよろしいお時間はございますでしょうか？\n\nなお、行き違いで他のお客様のご予約が入る場合もございますため、その際は改めてご都合のよい日時をお伺いできますと幸いです☺️\n\nどうぞよろしくお願いいたします。`;
 
   // 表示
   let html = '';
-  html += `<button class="btn btn-primary" id="copySearchResult" style="width:100%;margin-bottom:10px;font-size:13px">📋 コピー</button>`;
+  html += `<button class="btn btn-primary" id="copySearchResult" style="width:100%;margin-bottom:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> コピー</button>`;
   html += `<div class="search-results">`;
-  mergedLines.forEach(l => {
-    html += `<div class="search-result-day" data-dk="${l.dk}">
-      <span class="date-label">・${l.date} ${l.slot}</span>
+  dayMap.forEach(d => {
+    const slotsJP = d.slots.map(s => formatTimeJP(s));
+    html += `<div class="search-result-day" data-dk="${d.dk}">
+      <span class="date-label">${d.date}</span>
+      <span class="slots">${slotsJP.join(' / ')}</span>
     </div>`;
   });
   html += `</div>`;
 
   resultsEl.innerHTML = html;
 
-  // コピーボタン
+  // コピーボタン + 通知
   document.getElementById('copySearchResult').addEventListener('click', () => {
     navigator.clipboard.writeText(copyText).then(() => {
       const btn = document.getElementById('copySearchResult');
-      btn.textContent = '✓ コピーしました';
+      btn.innerHTML = '✓ コピーしました';
       btn.style.background = 'var(--success)';
-      setTimeout(() => { btn.textContent = '📋 コピー'; btn.style.background = ''; }, 2000);
+      setTimeout(() => {
+        btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> コピー`;
+        btn.style.background = '';
+      }, 2000);
+      // 通知
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('コピー完了', { body: 'ご案内可能日時をクリップボードにコピーしました' });
+      }
     });
   });
 
