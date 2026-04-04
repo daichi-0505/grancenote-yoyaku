@@ -1948,15 +1948,67 @@ async function executeSearch() {
     return;
   }
 
-  resultsEl.innerHTML = results.map(r => {
-    const staffLines = r.staffSlots.map(ss =>
-      `<div style="font-size:12px;padding:2px 0"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ss.color};margin-right:4px"></span><strong>${ss.name}</strong> ${ss.slots.join('、')}</div>`
-    ).join('');
-    return `<div class="search-result-day" data-dk="${r.dk}">
-      <span class="date-label">${r.date}</span>
-      ${staffLines}
-    </div>`;
-  }).join('');
+  // スタッフ別にグループ化して日時を羅列
+  const staffGroups = {};
+  results.forEach(r => {
+    r.staffSlots.forEach(ss => {
+      if (!staffGroups[ss.name]) staffGroups[ss.name] = { color: ss.color, lines: [] };
+      ss.slots.forEach(slot => {
+        staffGroups[ss.name].lines.push(`${r.date} ${slot}`);
+      });
+    });
+  });
+
+  // コピー用テキスト生成
+  let copyLines = [];
+  results.forEach(r => {
+    r.staffSlots.forEach(ss => {
+      ss.slots.forEach(slot => {
+        copyLines.push(`・${r.date} ${slot}`);
+      });
+    });
+  });
+  const copyText = `【ご案内可能日時】\n${copyLines.join('\n')}\n\nご都合いかがでしょうか☺️`;
+
+  // 表示: スタッフ名は上、日時は下に羅列
+  let html = '';
+  // スタッフ名表示
+  const staffNames = Object.keys(staffGroups);
+  html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">`;
+  staffNames.forEach(name => {
+    const g = staffGroups[name];
+    html += `<span style="font-size:12px;font-weight:800;color:${g.color}">●${name}</span>`;
+  });
+  html += `</div>`;
+
+  // コピーボタン
+  html += `<button class="btn btn-primary" id="copySearchResult" style="width:100%;margin-bottom:10px;font-size:13px">📋 コピー</button>`;
+
+  // 日時リスト
+  html += `<div class="search-results">`;
+  results.forEach(r => {
+    r.staffSlots.forEach(ss => {
+      ss.slots.forEach(slot => {
+        html += `<div class="search-result-day" data-dk="${r.dk}" style="display:flex;align-items:center;gap:6px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ss.color};flex-shrink:0"></span>
+          <span class="date-label">${r.date} ${slot}</span>
+        </div>`;
+      });
+    });
+  });
+  html += `</div>`;
+
+  resultsEl.innerHTML = html;
+
+  // コピーボタン
+  document.getElementById('copySearchResult').addEventListener('click', () => {
+    navigator.clipboard.writeText(copyText).then(() => {
+      const btn = document.getElementById('copySearchResult');
+      btn.textContent = '✓ コピーしました';
+      btn.style.background = 'var(--success)';
+      setTimeout(() => { btn.textContent = '📋 コピー'; btn.style.background = ''; }, 2000);
+    });
+  });
 
   // タップで予約表に飛ぶ
   resultsEl.querySelectorAll('.search-result-day').forEach(el => {
