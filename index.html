@@ -415,12 +415,7 @@ body {
 .detail-toggle.open .arrow { transform: rotate(90deg); }
 .detail-section { display: none; padding: 8px 0; }
 .detail-section.open { display: block; }
-.sub-block { z-index: 3; pointer-events: none; border-radius: 5px; opacity: 0.95; padding: 0; }
-.res-text-layer {
-  position: absolute; top: 2px; bottom: 2px; z-index: 5; cursor: pointer;
-  display: flex; flex-direction: column; justify-content: center;
-  padding: 2px 4px; overflow: hidden;
-}
+.sub-block { pointer-events: none; border-radius: 5px; opacity: 0.9; padding: 0; }
 .sub-assignment {
   display: flex; align-items: center; gap: 6px; padding: 4px 0;
   border-bottom: 1px solid var(--border-default);
@@ -1273,10 +1268,8 @@ function renderGrid() {
         style += `;top:${h * ol.index}%;bottom:${100 - h * (ol.index + 1)}%`;
       }
 
-      // 色ブロック（背景のみ）
-      html += `<div class="${cls}" style="${style}"></div>`;
-      // 文字レイヤー（最上位、タップ可能）
-      html += `<div class="res-text-layer type-${type}${noStaff ? ' no-staff' : ''}" style="left:${left}%;width:${width}%" data-id="${res.id}">`;
+      // 予約枠（背景+文字、タップ可能）
+      html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
       html += `<span class="res-time-label">${res.start}〜</span>`;
@@ -1336,18 +1329,18 @@ function renderGrid() {
   html += '</div>';
   wrapper.innerHTML = '<div class="grid-scroll">' + html + '</div>';
 
-  // Events: time-cells handles both reservation taps and blank area taps
+  // Events
+  wrapper.querySelectorAll('.reservation[data-id]').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const res = dayReservations.find(r => r.id === el.dataset.id);
+      if (res) openViewModal(res);
+    });
+  });
   wrapper.querySelectorAll('.time-cells').forEach(tc => {
     tc.addEventListener('click', e => {
-      // 予約テキストレイヤーをタップした場合
-      const textLayer = e.target.closest('.res-text-layer');
-      if (textLayer) {
-        e.stopPropagation();
-        const res = dayReservations.find(r => r.id === textLayer.dataset.id);
-        if (res) openViewModal(res);
-        return;
-      }
-      // 空白エリアをタップ → 新規予約追加
+      // 予約枠をタップした場合はスキップ（上のハンドラで処理済み）
+      if (e.target.closest('.reservation[data-id]')) return;
       const rect = tc.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
       const clickMin = Math.round(pct * totalH * 60 / 15) * 15;
