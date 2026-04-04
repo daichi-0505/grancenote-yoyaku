@@ -158,13 +158,33 @@ body {
   margin-right: 4px; white-space: nowrap;
 }
 .staff-chip {
-  display: flex; align-items: center; gap: 3px; padding: 1px 6px;
-  border-radius: 10px; font-size: 10px; font-weight: 700;
-  border: 1.5px solid var(--border-default); cursor: pointer;
+  display: flex; align-items: center; gap: 3px; padding: 2px 8px;
+  border-radius: 10px; font-size: 10px; font-weight: 800;
+  border: none; cursor: pointer; color: #fff;
   transition: all .15s; white-space: nowrap;
 }
-.staff-chip.active { border-color: transparent; color: var(--text-primary); }
-.staff-chip.inactive { opacity: 0.35; }
+.staff-chip.inactive { opacity: 0.3; }
+
+/* シフトバー（大画面用） */
+.shift-bar-row {
+  display: flex; flex-shrink: 0; height: 18px;
+  background: var(--bg-card);
+}
+.shift-bar-cells { flex: 1; position: relative; margin-right: 20px; }
+.shift-line {
+  position: absolute; top: 3px; height: 12px;
+  border-radius: 6px; opacity: 0.7;
+  display: flex; align-items: center; padding-left: 4px;
+  font-size: 8px; font-weight: 800; color: #fff; overflow: hidden; white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .staff-status-bar { padding: 4px 16px; gap: 8px; }
+  .staff-chip { padding: 3px 10px; font-size: 12px; }
+  .staff-status-label { font-size: 12px; }
+  .shift-bar-row { height: 22px; }
+  .shift-line { top: 3px; height: 16px; font-size: 9px; padding-left: 6px; }
+}
 
 /* Time header（枠の外） */
 .time-header-row {
@@ -428,15 +448,34 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbzTSVuhM9C8nn4H9_e2_Zcu
 
 // ── デフォルトデータ（API未接続時のフォールバック） ──
 const DEFAULT_STAFF = [
-  { id: 's1', name: '峯 琴音', color: '#FFE082' },
-  { id: 's2', name: 'リン ション', color: '#F8BBD0' },
-  { id: 's3', name: '西村 由維', color: '#C8E6C9' },
-  { id: 's4', name: '峯 敏絵', color: '#B3E5FC' },
-  { id: 's5', name: '林 美志', color: '#E1BEE7' },
-  { id: 's6', name: '黒岩 結花', color: '#FFE0B2' },
-  { id: 's7', name: '福山 結子', color: '#B2DFDB' },
-  { id: 's8', name: '藤原 嘉子', color: '#F0F4C3' },
+  { id: 's1', name: '峯 琴音', color: '#E53935', role: '正社員' },
+  { id: 's9', name: '朝倉 万紀子', color: '#1E88E5', role: '正社員' },
+  { id: 's4', name: '峯 敏絵', color: '#43A047', role: 'オーナー' },
+  { id: 's2', name: 'リン ション', color: '#FB8C00', role: 'パート' },
+  { id: 's3', name: '西村 由維', color: '#8E24AA', role: 'パート' },
+  { id: 's5', name: '林 美志', color: '#00897B', role: 'パート' },
 ];
+
+// スタッフ勤務時間（テスト用。今後シフトデータに差し替え）
+function getStaffShift(staffId, date) {
+  const dow = date.getDay();
+  const bh = getBH(date);
+  if (!bh) return null; // 定休日
+  switch (staffId) {
+    case 's1': // 峯琴音（正社員）フル
+    case 's9': // 朝倉万紀子（正社員）フル
+    case 's4': // 峯敏絵（オーナー）フル
+      return { start: bh.start, end: bh.end };
+    case 's2': // リンション（パート）〜17:00
+      return { start: bh.start, end: 17 };
+    case 's3': // 西村由維（パート）〜13:00
+      return { start: bh.start, end: 13 };
+    case 's5': // 林美志（パート）土曜フル
+      return dow === 6 ? { start: bh.start, end: bh.end } : null;
+    default:
+      return { start: bh.start, end: bh.end };
+  }
+}
 const DEFAULT_ROOMS = [
   { id: 'r1', name: 'フェイシャル①', sub: '' },
   { id: 'r2', name: 'フェイシャル②', sub: '' },
@@ -565,11 +604,12 @@ function renderStaffStatus() {
   const bar = document.getElementById('staffStatusBar');
   bar.innerHTML = '<span class="staff-status-label">出勤</span>';
   staff.forEach(s => {
+    const shift = getStaffShift(s.id, currentDate);
     const chip = document.createElement('span');
-    chip.className = 'staff-chip active';
+    chip.className = 'staff-chip' + (shift ? '' : ' inactive');
     chip.style.background = s.color;
     chip.textContent = s.name.split(' ')[0];
-    chip.title = s.name;
+    chip.title = s.name + (shift ? ` (${shift.start}:00-${shift.end}:00)` : ' (休み)');
     bar.appendChild(chip);
   });
 }
@@ -618,8 +658,24 @@ function renderGrid() {
   }
   headerHtml += '</div></div>';
 
+  // シフトバー（大画面のみ表示）
+  let shiftHtml = '';
+  if (window.innerWidth >= 768) {
+    staff.forEach(s => {
+      const shift = getStaffShift(s.id, currentDate);
+      if (!shift) return;
+      shiftHtml += `<div class="shift-bar-row">`;
+      shiftHtml += `<div class="corner-cell" style="width:${labelW}px"></div>`;
+      shiftHtml += `<div class="shift-bar-cells">`;
+      const left = (shift.start - bh.start) / totalH * 100;
+      const width = (shift.end - shift.start) / totalH * 100;
+      shiftHtml += `<div class="shift-line" style="left:${left}%;width:${width}%;background:${s.color}">${s.name.split(' ')[0]} ${shift.start}:00-${shift.end}:00</div>`;
+      shiftHtml += `</div></div>`;
+    });
+  }
+
   // Scrollable room rows
-  let html = headerHtml + '<div class="grid-table">';
+  let html = headerHtml + shiftHtml + '<div class="grid-table">';
   rooms.forEach(room => {
     const dc = room.divider ? ' section-divider' : '';
     html += `<div class="room-row${dc}">`;
