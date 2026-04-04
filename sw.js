@@ -1,6 +1,6 @@
-// 予約帳 Service Worker v2
+// 予約帳 Service Worker v3
 // キャッシュなし。常にネットワークから取得。
-const CACHE_NAME = 'yoyaku-v2';
+const CACHE_NAME = 'yoyaku-v3';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {
