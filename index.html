@@ -38,26 +38,26 @@ body {
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
-/* 強制横表示: 縦持ち時にCSS即時回転（JS遅延なし） */
+/* 縦持ち時:「横に回してください」表示 */
+.portrait-overlay {
+  position: fixed; inset: 0; background: #fff;
+  z-index: 998; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; color: var(--accent);
+}
+.portrait-overlay .rotate-icon {
+  font-size: 48px; animation: rotateHint 2s ease-in-out infinite;
+}
+@keyframes rotateHint {
+  0%,100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+.portrait-overlay .rotate-text {
+  font-size: 16px; font-weight: 800; letter-spacing: 1px;
+}
 @media (orientation: portrait) {
-  html {
-    position: fixed; top: 0; left: 0;
-    width: var(--landscape-w, 100vh) !important;
-    height: var(--landscape-h, 100vw) !important;
-    transform: rotate(90deg);
-    transform-origin: top left;
-    margin-left: var(--landscape-h, 100vw);
-    overflow: hidden;
-  }
+  .portrait-overlay { display: flex; }
 }
-
-/* 回転時のガクつき防止: オーバーレイで隠す */
-.rotation-shield {
-  position: fixed; inset: 0; background: var(--bg-primary);
-  z-index: 998; pointer-events: none; opacity: 0;
-  transition: opacity 0.15s ease;
-}
-.rotation-shield.active { opacity: 1; transition: none; }
 
 /* ── Loading ── */
 .loading-overlay {
@@ -359,7 +359,10 @@ body {
 </head>
 <body>
 
-<div class="rotation-shield" id="rotationShield"></div>
+<div class="portrait-overlay" id="portraitOverlay">
+  <span class="rotate-icon">&#x1F4F1;</span>
+  <span class="rotate-text">横向きにしてください</span>
+</div>
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
   <div class="loading-text">読み込み中...</div>
@@ -934,37 +937,21 @@ document.addEventListener('touchend', e => {
   if (Math.abs(diff) > 80) changeDate(diff > 0 ? -1 : 1);
 }, { passive: true });
 
-// ── 強制横表示 ──
-function forceLandscape() {
-  // Screen Orientation API（PWA時に有効）
+// ── 横向き専用 ──
+function setupLandscape() {
+  // PWA時: orientation lock
   try {
     if (screen.orientation && screen.orientation.lock) {
       screen.orientation.lock('landscape').catch(() => {});
     }
   } catch(e) {}
-
-  // CSS変数に固定px値をセット（1回だけ。vh/vwは回転で値が変わるため）
-  const landscapeW = Math.max(screen.width, screen.height);
-  const landscapeH = Math.min(screen.width, screen.height);
-  document.documentElement.style.setProperty('--landscape-w', landscapeW + 'px');
-  document.documentElement.style.setProperty('--landscape-h', landscapeH + 'px');
-  // 回転時: オーバーレイで隠してガクつきを見せない
-  const shield = document.getElementById('rotationShield');
-  let orientationTimer;
-  window.addEventListener('resize', () => {
-    if (window.innerWidth < 1024) {
-      shield.classList.add('active');
-      clearTimeout(orientationTimer);
-      orientationTimer = setTimeout(() => shield.classList.remove('active'), 400);
-    }
-  });
 }
 
 // ── 初期化 ──
 function renderAll() { renderHeader(); renderChecklist(); renderGrid(); }
 
 async function init() {
-  forceLandscape();
+  setupLandscape();
   await loadConfig();
   await loadDayData();
   renderAll();
