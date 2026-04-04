@@ -142,8 +142,9 @@ body {
 
 /* ── Grid ── */
 .grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 0 12px 8px 12px; }
-.grid-scroll { flex: 1; display: flex; flex-direction: column; overflow: hidden; transition: none; }
+.grid-scroll { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .grid-scroll.scrollable { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.grid-scroll.scrollable .grid-table { flex: none; }
 .grid-table { display: flex; flex-direction: column; width: 100%; border: 2px solid var(--accent); border-radius: 6px; overflow: hidden; flex: 1; }
 
 /* Memo space */
@@ -158,6 +159,7 @@ body {
 .staff-status-label {
   font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px;
   white-space: nowrap; display: flex; align-items: center; gap: 4px;
+  margin-left: auto;
 }
 .staff-toggle-icon {
   font-size: 8px; transition: transform 0.2s;
