@@ -327,12 +327,50 @@ body {
   position: absolute; top: 2px; bottom: 2px;
   border-radius: 5px; padding: 2px 4px;
   cursor: pointer; z-index: 3; overflow: hidden;
-  border: 1px solid rgba(0,0,0,0.08);
   display: flex; flex-direction: column; justify-content: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   transition: transform .1s;
 }
 .reservation:active { transform: scale(0.98); }
+/* 種別スタイル */
+.reservation.type-treatment {
+  border: 2px solid var(--res-color, #888);
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.reservation.type-treatment.checked-in {
+  background: var(--res-color-bg, rgba(0,0,0,0.08));
+}
+.reservation.type-break {
+  border: 2px dashed var(--res-color, #888);
+  background: rgba(255,255,255,0.5);
+}
+.reservation.type-task {
+  border: none; border-top: 3px solid var(--res-color, #888);
+  border-bottom: 3px solid var(--res-color, #888);
+  background: transparent; border-radius: 0;
+}
+.reservation.type-shopping {
+  border: 2px solid var(--res-color, #888);
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.reservation.no-staff {
+  border-color: #9CA3AF !important;
+  background: rgba(200,200,200,0.3) !important;
+}
+/* 重なり表示 */
+.reservation.overlap-0 { top: 2px; bottom: 50%; }
+.reservation.overlap-1 { top: 50%; bottom: 2px; }
+.reservation.overlap-2 { top: 2px; bottom: 66%; }
+.reservation.overlap-3 { top: 34%; bottom: 34%; }
+.reservation.overlap-4 { top: 66%; bottom: 2px; }
+/* チェックイン済み */
+.res-checkin { font-size: 10px; position: absolute; top: 1px; right: 3px; }
+/* アフターケア線 */
+.aftercare-line {
+  position: absolute; bottom: 2px; right: 0;
+  height: 3px; border-radius: 0 0 3px 0; z-index: 3; pointer-events: none;
+}
 .res-top { display: flex; align-items: center; gap: 3px; }
 .res-menu-label {
   font-size: 10px; font-weight: 800; color: #fff;
@@ -343,7 +381,37 @@ body {
   font-size: 9px; font-weight: 700; color: rgba(0,0,0,0.5);
   background: rgba(255,255,255,0.5); padding: 0 3px; border-radius: 3px;
 }
+.res-type-tag {
+  font-size: 9px; font-weight: 800; color: var(--text-secondary);
+  background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px;
+  white-space: nowrap;
+}
 .res-name { font-size: 12px; font-weight: 800; color: var(--text-primary); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.res-name.no-staff-warn { color: var(--danger); font-size: 10px; }
+/* 種別選択ボタン */
+.type-selector { display: flex; gap: 6px; padding: 8px 0; flex-wrap: wrap; }
+.type-btn {
+  flex: 1; min-width: 70px; padding: 10px 8px; border: 2px solid var(--border-default); border-radius: 10px;
+  background: var(--bg-card); font-size: 13px; font-weight: 800; color: var(--text-secondary);
+  cursor: pointer; text-align: center; transition: all .15s;
+}
+.type-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.type-btn:active { opacity: 0.8; }
+/* 詳細設定 */
+.detail-toggle {
+  display: flex; align-items: center; gap: 4px; padding: 8px 0;
+  font-size: 12px; font-weight: 700; color: var(--text-muted); cursor: pointer;
+  border: none; background: none;
+}
+.detail-toggle .arrow { transition: transform .2s; }
+.detail-toggle.open .arrow { transform: rotate(90deg); }
+.detail-section { display: none; padding: 8px 0; }
+.detail-section.open { display: block; }
+.sub-assignment {
+  display: flex; align-items: center; gap: 6px; padding: 4px 0;
+  border-bottom: 1px solid var(--border-default);
+}
+.sub-assignment:last-child { border: none; }
 
 /* Now line */
 .now-line {
@@ -530,15 +598,43 @@ body {
       <button class="modal-close" id="modalClose">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="form-group"><label>お客様名</label><input type="text" id="resName" placeholder="山田 花子 様" autocomplete="off"></div>
-      <div class="form-group"><label>メニュー</label><input type="text" id="resMenu" placeholder="フェイシャル" value="フェイシャル" autocomplete="off"></div>
+      <div class="type-selector" id="typeSelector">
+        <button class="type-btn active" data-type="treatment">施術</button>
+        <button class="type-btn" data-type="break">休憩</button>
+        <button class="type-btn" data-type="task">業務</button>
+        <button class="type-btn" data-type="shopping">🛒 買い物</button>
+      </div>
+      <div id="treatmentFields">
+        <div class="form-group"><label>お客様名</label><input type="text" id="resName" placeholder="山田 花子 様" autocomplete="off"></div>
+        <div class="form-group"><label>メニュー</label><input type="text" id="resMenu" placeholder="フェイシャル" value="フェイシャル" autocomplete="off"></div>
+      </div>
       <div class="form-group"><label>担当スタッフ</label><select id="resStaff"></select></div>
       <div class="form-row">
         <div class="form-group"><label>開始</label><select id="resStart"></select></div>
         <div class="form-group"><label>終了</label><select id="resEnd"></select></div>
       </div>
+      <div id="aftercareFields" style="display:none">
+        <div class="form-row">
+          <div class="form-group"><label>アフターケア終了</label><select id="resAftercareEnd"><option value="">なし</option></select></div>
+          <div class="form-group"><label>ケア担当</label><select id="resAftercareStaff"><option value="">施術と同じ</option></select></div>
+        </div>
+      </div>
       <div class="form-group"><label>部屋</label><select id="resRoom"></select></div>
-      <div class="form-group"><label>メモ</label><input type="text" id="resMemo" placeholder="新規、ホトペ、など" autocomplete="off"></div>
+      <div class="form-group"><label>メモ</label><input type="text" id="resMemo" placeholder="新規、ホトペ、リマインド等" autocomplete="off"></div>
+      <div id="checkinField" style="display:none">
+        <label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;font-weight:700;cursor:pointer">
+          <input type="checkbox" id="resCheckedIn" style="width:18px;height:18px"> 来店チェック
+        </label>
+      </div>
+      <button class="detail-toggle" id="detailToggle" style="display:none">
+        <span class="arrow">▶</span> 詳細設定（分担）
+      </button>
+      <div class="detail-section" id="detailSection">
+        <div class="form-group"><label>施術分担</label>
+          <div id="subAssignments"></div>
+          <button class="add-btn" id="addSubAssignment" style="margin-top:4px">+ 分担を追加</button>
+        </div>
+      </div>
     </div>
     <div class="modal-footer" id="modalFooter">
       <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
@@ -750,8 +846,12 @@ async function syncDayDataFromApi() {
     if (resData) {
       dayReservations = resData.map(r => ({
         id: r.id, date: r.date, name: r.name, menu: r.menu || '',
-        staffId: r.staff_id, start: r.start_time, end: r.end_time,
-        roomId: r.room_id, memo: r.memo || '', updatedAt: r.updated_at
+        staffId: r.staff_id || '', start: r.start_time, end: r.end_time,
+        roomId: r.room_id, memo: r.memo || '', updatedAt: r.updated_at,
+        type: r.type || 'treatment', checkedIn: r.checked_in || false,
+        aftercareEnd: r.aftercare_end || null,
+        aftercareStaffId: r.aftercare_staff_id || null,
+        subAssignments: r.sub_assignments || null,
       }));
       const allRes = lsLoad('reservations', {});
       allRes[dk] = dayReservations;
@@ -1066,6 +1166,24 @@ function renderChecklist() {
   });
 }
 
+function detectOverlaps(reservations, bh) {
+  const result = {};
+  const mins = reservations.map(r => {
+    const [sh,sm] = r.start.split(':').map(Number);
+    const [eh,em] = r.end.split(':').map(Number);
+    return { id: r.id, s: (sh - bh.start) * 60 + sm, e: (eh - bh.start) * 60 + em };
+  });
+  mins.forEach((a, i) => {
+    const overlapping = mins.filter((b, j) => j !== i && a.s < b.e && a.e > b.s);
+    if (overlapping.length > 0) {
+      const group = [a, ...overlapping].sort((x, y) => x.s - y.s || x.id.localeCompare(y.id));
+      const idx = group.findIndex(g => g.id === a.id);
+      result[a.id] = { index: idx, total: group.length };
+    }
+  });
+  return result;
+}
+
 function renderGrid() {
   const wrapper = document.getElementById('gridWrapper');
   const bh = getBH(currentDate);
@@ -1109,7 +1227,9 @@ function renderGrid() {
     html += `<div class="click-overlay" data-room="${room.id}"></div>`;
 
     const rr = dayReservations.filter(r => r.roomId === room.id);
-    rr.forEach(res => {
+    // 重なり検出
+    const overlaps = detectOverlaps(rr, bh);
+    rr.forEach((res, ri) => {
       const [sh,sm] = res.start.split(':').map(Number);
       const [eh,em] = res.end.split(':').map(Number);
       const sMin = (sh - bh.start) * 60 + sm;
@@ -1117,14 +1237,55 @@ function renderGrid() {
       const tMin = totalH * 60;
       const left = sMin / tMin * 100;
       const width = Math.max((eMin - sMin) / tMin * 100, 2);
-      const s = staff.find(st => st.id === res.staffId);
-      const bg = s ? s.color : '#e0e0e0';
-      html += `<div class="reservation" style="left:${left}%;width:${width}%;background:${bg}" data-id="${res.id}">`;
+      const s = res.staffId ? staff.find(st => st.id === res.staffId) : null;
+      const color = s ? s.color : '#9CA3AF';
+      const type = res.type || 'treatment';
+      const isChecked = res.checkedIn;
+      const noStaff = !res.staffId;
+      const ol = overlaps[res.id] || { index: -1, total: 1 };
+
+      let cls = `reservation type-${type}`;
+      if (isChecked) cls += ' checked-in';
+      if (noStaff) cls += ' no-staff';
+      if (ol.total > 1) cls += ` overlap-${ol.index}`;
+
+      // CSS変数でスタッフ色を渡す
+      const colorBg = color + '25'; // 15% alpha
+      let style = `left:${left}%;width:${width}%;--res-color:${color};--res-color-bg:${colorBg}`;
+      // 重なり時のtop/bottom
+      if (ol.total === 2) {
+        if (ol.index === 0) style += ';top:2px;bottom:50%';
+        else style += ';top:50%;bottom:2px';
+      } else if (ol.total >= 3) {
+        const h = 100 / ol.total;
+        style += `;top:${h * ol.index}%;bottom:${100 - h * (ol.index + 1)}%`;
+      }
+
+      html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
+      if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
+      if (type !== 'treatment' && type !== 'shopping') {
+        const typeLabels = { break: '休憩', task: '業務', shopping: '🛒' };
+        html += `<span class="res-type-tag">${typeLabels[type] || type}</span>`;
+      }
       if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
-      html += `<span class="res-name">${res.name}</span>`;
+      if (noStaff) {
+        html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
+      } else {
+        html += `<span class="res-name">${res.name}</span>`;
+      }
+      // アフターケア線
+      if (res.aftercareEnd && type === 'treatment') {
+        const acStaff = res.aftercareStaffId ? staff.find(st => st.id === res.aftercareStaffId) : s;
+        const acColor = acStaff ? acStaff.color : color;
+        const [ach, acm] = res.aftercareEnd.split(':').map(Number);
+        const acMin = (ach - bh.start) * 60 + acm;
+        const acWidth = Math.max((acMin - eMin) / tMin * 100, 1);
+        // アフターケアは予約枠の右端から伸びる
+        html += `<div class="aftercare-line" style="width:${acWidth / (width/100) * 100}%;background:${acColor}"></div>`;
+      }
       html += '</div>';
     });
 
@@ -1163,26 +1324,126 @@ function renderGrid() {
 
 // ── Modals ──
 let editingRes = null;
+let currentType = 'treatment';
+
+function setType(type) {
+  currentType = type;
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  const isTreatment = type === 'treatment';
+  const isShopping = type === 'shopping';
+  document.getElementById('treatmentFields').style.display = (isTreatment || isShopping) ? '' : 'none';
+  document.getElementById('aftercareFields').style.display = isTreatment ? '' : 'none';
+  document.getElementById('checkinField').style.display = isTreatment ? '' : 'none';
+  document.getElementById('detailToggle').style.display = isTreatment ? '' : 'none';
+  // 施術以外はお客様名不要の場合もあるがinputは残す
+  if (!isTreatment && !isShopping) {
+    document.getElementById('resName').placeholder = 'メモ';
+  } else {
+    document.getElementById('resName').placeholder = '山田 花子 様';
+  }
+}
+
+// 種別選択イベント
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.addEventListener('click', () => setType(btn.dataset.type));
+});
+
+// 詳細設定トグル
+document.getElementById('detailToggle').addEventListener('click', function() {
+  this.classList.toggle('open');
+  document.getElementById('detailSection').classList.toggle('open');
+});
 
 function populateTimeSelects(bh) {
   const opts = getTimeOpts(bh);
   ['resStart','resEnd'].forEach(id => {
     document.getElementById(id).innerHTML = opts.map(t => `<option value="${t}">${t}</option>`).join('');
   });
+  // アフターケア終了時間
+  const acEnd = document.getElementById('resAftercareEnd');
+  acEnd.innerHTML = '<option value="">なし</option>' + opts.map(t => `<option value="${t}">${t}</option>`).join('');
 }
 function populateStaffSelect() {
-  document.getElementById('resStaff').innerHTML = staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  const staffOpts = '<option value="">未定</option>' + staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  document.getElementById('resStaff').innerHTML = staffOpts;
+  // アフターケア担当
+  document.getElementById('resAftercareStaff').innerHTML = '<option value="">施術と同じ</option>' + staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 }
 function populateRoomSelect(rid) {
   document.getElementById('resRoom').innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id===rid?'selected':''}>${r.name}</option>`).join('');
 }
 
+function populateSubAssignments(subs) {
+  const div = document.getElementById('subAssignments');
+  div.innerHTML = '';
+  (subs || []).forEach((sub, i) => {
+    const row = document.createElement('div');
+    row.className = 'sub-assignment';
+    row.innerHTML = `
+      <select class="sub-staff" data-idx="${i}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px;flex:1">
+        ${staff.map(s => `<option value="${s.id}" ${s.id===sub.staffId?'selected':''}>${s.name}</option>`).join('')}
+      </select>
+      <select class="sub-start" data-idx="${i}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px">
+        ${getTimeOpts(getBH(currentDate)).map(t => `<option value="${t}" ${t===sub.start?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <span>〜</span>
+      <select class="sub-end" data-idx="${i}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px">
+        ${getTimeOpts(getBH(currentDate)).map(t => `<option value="${t}" ${t===sub.end?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <button style="border:none;background:rgba(239,68,68,0.1);color:var(--danger);border-radius:6px;width:24px;height:24px;cursor:pointer;font-weight:700" onclick="this.closest('.sub-assignment').remove()">&times;</button>
+    `;
+    div.appendChild(row);
+  });
+}
+
+document.getElementById('addSubAssignment').addEventListener('click', () => {
+  const bh = getBH(currentDate);
+  if (!bh) return;
+  const start = document.getElementById('resStart').value || `${bh.start}:00`;
+  const end = document.getElementById('resEnd').value || `${bh.end}:00`;
+  const div = document.getElementById('subAssignments');
+  const idx = div.children.length;
+  const row = document.createElement('div');
+  row.className = 'sub-assignment';
+  row.innerHTML = `
+    <select class="sub-staff" data-idx="${idx}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px;flex:1">
+      ${staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+    </select>
+    <select class="sub-start" data-idx="${idx}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px">
+      ${getTimeOpts(getBH(currentDate)).map(t => `<option value="${t}" ${t===start?'selected':''}>${t}</option>`).join('')}
+    </select>
+    <span>〜</span>
+    <select class="sub-end" data-idx="${idx}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px">
+      ${getTimeOpts(getBH(currentDate)).map(t => `<option value="${t}" ${t===end?'selected':''}>${t}</option>`).join('')}
+    </select>
+    <button style="border:none;background:rgba(239,68,68,0.1);color:var(--danger);border-radius:6px;width:24px;height:24px;cursor:pointer;font-weight:700" onclick="this.closest('.sub-assignment').remove()">&times;</button>
+  `;
+  div.appendChild(row);
+});
+
+function getSubAssignments() {
+  const rows = document.querySelectorAll('#subAssignments .sub-assignment');
+  if (rows.length === 0) return null;
+  return Array.from(rows).map(row => ({
+    staffId: row.querySelector('.sub-staff').value,
+    start: row.querySelector('.sub-start').value,
+    end: row.querySelector('.sub-end').value,
+  }));
+}
+
 function openAddModal(roomId, hour, mins, bh) {
   editingRes = null;
+  setType('treatment');
   document.getElementById('modalTitle').textContent = '予約を追加';
   document.getElementById('resName').value = '';
   document.getElementById('resMenu').value = 'フェイシャル';
   document.getElementById('resMemo').value = '';
+  document.getElementById('resCheckedIn').checked = false;
+  document.getElementById('resAftercareEnd').value = '';
+  document.getElementById('resAftercareStaff').value = '';
+  document.getElementById('detailToggle').classList.remove('open');
+  document.getElementById('detailSection').classList.remove('open');
+  populateSubAssignments([]);
   populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(roomId);
   document.getElementById('resStart').value = `${hour}:${String(mins).padStart(2,'0')}`;
   let eh = hour + 1, em = mins;
@@ -1197,14 +1458,25 @@ function openAddModal(roomId, hour, mins, bh) {
 function openEditModal(res) {
   const bh = getBH(currentDate); if (!bh) return;
   editingRes = res;
-  document.getElementById('modalTitle').textContent = '予約を編集';
+  setType(res.type || 'treatment');
+  document.getElementById('modalTitle').textContent = '編集';
   document.getElementById('resName').value = res.name;
   document.getElementById('resMenu').value = res.menu || '';
   document.getElementById('resMemo').value = res.memo || '';
+  document.getElementById('resCheckedIn').checked = !!res.checkedIn;
   populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(res.roomId);
   document.getElementById('resStart').value = res.start;
   document.getElementById('resEnd').value = res.end;
-  document.getElementById('resStaff').value = res.staffId;
+  document.getElementById('resStaff').value = res.staffId || '';
+  document.getElementById('resAftercareEnd').value = res.aftercareEnd || '';
+  document.getElementById('resAftercareStaff').value = res.aftercareStaffId || '';
+  document.getElementById('detailToggle').classList.remove('open');
+  document.getElementById('detailSection').classList.remove('open');
+  populateSubAssignments(res.subAssignments || []);
+  if (res.subAssignments && res.subAssignments.length > 0) {
+    document.getElementById('detailToggle').classList.add('open');
+    document.getElementById('detailSection').classList.add('open');
+  }
   document.getElementById('modalFooter').innerHTML = `
     <button class="btn btn-danger" onclick="deleteReservation()">削除</button>
     <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
@@ -1216,17 +1488,23 @@ function closeModal(id) { document.getElementById(id).classList.remove('active')
 
 async function saveReservation() {
   const name = document.getElementById('resName').value.trim();
-  if (!name) { alert('お客様名を入力してください'); return; }
+  const isTreatment = currentType === 'treatment' || currentType === 'shopping';
+  if (isTreatment && !name) { alert('お客様名を入力してください'); return; }
   const data = {
     id: editingRes ? editingRes.id : 'r' + Date.now(),
     date: dateKey(currentDate),
-    name,
-    menu: document.getElementById('resMenu').value.trim(),
-    staffId: document.getElementById('resStaff').value,
+    name: name || currentType,
+    menu: isTreatment ? document.getElementById('resMenu').value.trim() : '',
+    staffId: document.getElementById('resStaff').value || '',
     start: document.getElementById('resStart').value,
     end: document.getElementById('resEnd').value,
     roomId: document.getElementById('resRoom').value,
     memo: document.getElementById('resMemo').value.trim(),
+    type: currentType,
+    checkedIn: document.getElementById('resCheckedIn').checked,
+    aftercareEnd: document.getElementById('resAftercareEnd').value || null,
+    aftercareStaffId: document.getElementById('resAftercareStaff').value || null,
+    subAssignments: getSubAssignments(),
   };
 
   if (editingRes) {
@@ -1245,8 +1523,12 @@ async function saveReservation() {
   // Supabaseにも保存
   sbUpsert('yoyaku_reservations', {
     id: data.id, date: data.date, name: data.name, menu: data.menu,
-    staff_id: data.staffId, start_time: data.start, end_time: data.end,
-    room_id: data.roomId, memo: data.memo, updated_at: new Date().toISOString()
+    staff_id: data.staffId || null, start_time: data.start, end_time: data.end,
+    room_id: data.roomId, memo: data.memo, type: data.type,
+    checked_in: data.checkedIn, aftercare_end: data.aftercareEnd,
+    aftercare_staff_id: data.aftercareStaffId,
+    sub_assignments: data.subAssignments ? JSON.stringify(data.subAssignments) : null,
+    updated_at: new Date().toISOString()
   });
 }
 
