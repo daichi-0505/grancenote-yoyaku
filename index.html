@@ -366,10 +366,10 @@ body {
 .reservation.overlap-4 { top: 66%; bottom: 2px; }
 /* チェックイン済み */
 .res-checkin { font-size: 10px; position: absolute; top: 1px; right: 3px; }
-/* アフターケア線 */
+/* アフターケア線（time-cells上に直接配置） */
 .aftercare-line {
-  position: absolute; bottom: 2px; right: 0;
-  height: 3px; border-radius: 0 0 3px 0; z-index: 3; pointer-events: none;
+  position: absolute; bottom: 4px;
+  height: 4px; z-index: 4; pointer-events: none; border-radius: 2px;
 }
 .res-top { display: flex; align-items: center; gap: 3px; }
 .res-menu-label {
@@ -610,8 +610,8 @@ body {
       </div>
       <div class="form-group"><label>担当スタッフ</label><select id="resStaff"></select></div>
       <div class="form-row">
-        <div class="form-group"><label>開始</label><select id="resStart"></select></div>
-        <div class="form-group"><label>終了</label><select id="resEnd"></select></div>
+        <div class="form-group"><label id="labelStart">施術開始</label><select id="resStart"></select></div>
+        <div class="form-group"><label id="labelEnd">施術終了</label><select id="resEnd"></select></div>
       </div>
       <div id="aftercareFields" style="display:none">
         <div class="form-row">
@@ -1276,17 +1276,17 @@ function renderGrid() {
       } else {
         html += `<span class="res-name">${res.name}</span>`;
       }
-      // アフターケア線
+      html += '</div>';
+      // アフターケア線（予約枠の外、time-cells上に直接配置）
       if (res.aftercareEnd && type === 'treatment') {
         const acStaff = res.aftercareStaffId ? staff.find(st => st.id === res.aftercareStaffId) : s;
         const acColor = acStaff ? acStaff.color : color;
         const [ach, acm] = res.aftercareEnd.split(':').map(Number);
         const acMin = (ach - bh.start) * 60 + acm;
-        const acWidth = Math.max((acMin - eMin) / tMin * 100, 1);
-        // アフターケアは予約枠の右端から伸びる
-        html += `<div class="aftercare-line" style="width:${acWidth / (width/100) * 100}%;background:${acColor}"></div>`;
+        const acLeft = eMin / tMin * 100;
+        const acWidth = Math.max((acMin - eMin) / tMin * 100, 0.5);
+        html += `<div class="aftercare-line" style="left:${acLeft}%;width:${acWidth}%;background:${acColor}"></div>`;
       }
-      html += '</div>';
     });
 
     const now = new Date();
@@ -1335,7 +1335,10 @@ function setType(type) {
   document.getElementById('aftercareFields').style.display = isTreatment ? '' : 'none';
   document.getElementById('checkinField').style.display = isTreatment ? '' : 'none';
   document.getElementById('detailToggle').style.display = isTreatment ? '' : 'none';
-  // 施術以外はお客様名不要の場合もあるがinputは残す
+  // ラベル変更
+  const labelMap = { treatment: ['施術開始','施術終了'], break: ['開始','終了'], task: ['開始','終了'], shopping: ['開始','終了'] };
+  document.getElementById('labelStart').textContent = labelMap[type][0];
+  document.getElementById('labelEnd').textContent = labelMap[type][1];
   if (!isTreatment && !isShopping) {
     document.getElementById('resName').placeholder = 'メモ';
   } else {
