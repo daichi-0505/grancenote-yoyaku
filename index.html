@@ -761,6 +761,9 @@ body {
       <div class="form-group"><label>希望曜日</label>
         <div class="search-filter-row" id="searchDowBtns"></div>
       </div>
+      <div class="form-group"><label>使用部屋（任意・複数選択可）</label>
+        <div class="search-filter-row" id="searchRoomBtns"></div>
+      </div>
       <div class="form-group"><label>施術時間</label>
         <div class="search-filter-row" id="searchDurationBtns"></div>
       </div>
@@ -1832,6 +1835,7 @@ async function quickCheckIn(resId) {
 // ── 空き枠検索 ──
 let searchSelectedStaffs = [];
 let searchSelectedDows = [];
+let searchSelectedRooms = [];
 let searchSelectedDuration = 90;
 
 function openSearchModal() {
@@ -1870,6 +1874,20 @@ function openSearchModal() {
       const d = parseInt(btn.dataset.dow);
       if (searchSelectedDows.includes(d)) searchSelectedDows = searchSelectedDows.filter(x => x !== d);
       else searchSelectedDows.push(d);
+      openSearchModal();
+    });
+  });
+
+  // 部屋ボタン
+  const roomEl = document.getElementById('searchRoomBtns');
+  roomEl.innerHTML = rooms.map(r =>
+    `<button class="search-filter-btn${searchSelectedRooms.includes(r.id) ? ' active' : ''}" data-rid="${r.id}">${r.name}</button>`
+  ).join('');
+  roomEl.querySelectorAll('.search-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.rid;
+      if (searchSelectedRooms.includes(id)) searchSelectedRooms = searchSelectedRooms.filter(x => x !== id);
+      else searchSelectedRooms.push(id);
       openSearchModal();
     });
   });
@@ -1919,17 +1937,25 @@ async function executeSearch() {
 
   // Supabaseから対象期間の予約・シフト・ブロックを取得
   const staffFilter = searchSelectedStaffs.map(id => `staff_id.eq.${id}`).join(',');
-  const [resData, shiftData, blockData] = await Promise.all([
+  const fetches = [
     sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&or=(${staffFilter})&select=date,start_time,end_time,type,staff_id`),
     sbGet('yoyaku_shifts', `date=gte.${startStr}&date=lte.${endStr}&or=(${staffFilter})`),
-    sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&type=eq.block&select=date,start_time,end_time,block_staff_ids`),
-  ]);
+    sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&type=eq.block&select=date,start_time,end_time,block_staff_ids,block_room_ids`),
+  ];
+  // 部屋指定がある場合、全予約（部屋の空きチェック用）も取得
+  if (searchSelectedRooms.length > 0) {
+    const roomFilter = searchSelectedRooms.map(id => `room_id.eq.${id}`).join(',');
+    fetches.push(sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&or=(${roomFilter})&type=neq.break&type=neq.task&type=neq.practice&select=date,start_time,end_time,room_id,type,block_room_ids`));
+  }
+  const [resData, shiftData, blockData, roomResData] = await Promise.all(fetches);
 
   const reservations = resData || [];
   const shifts = shiftData || [];
+  const allRoomRes = roomResData || [];
   const blocks = (blockData || []).map(b => ({
     ...b,
-    block_staff_ids: b.block_staff_ids ? (typeof b.block_staff_ids === 'string' ? JSON.parse(b.block_staff_ids) : b.block_staff_ids) : []
+    block_staff_ids: b.block_staff_ids ? (typeof b.block_staff_ids === 'string' ? JSON.parse(b.block_staff_ids) : b.block_staff_ids) : [],
+    block_room_ids: b.block_room_ids ? (typeof b.block_room_ids === 'string' ? JSON.parse(b.block_room_ids) : b.block_room_ids) : []
   }));
 
   const results = [];
@@ -1995,6 +2021,35 @@ async function executeSearch() {
       });
       for (let t = cursor; t + duration <= staffEndMin; t += 15) {
         slots.push(t);
+      }
+
+      // 部屋指定がある場合、部屋が空いてるスロットだけ残す
+      if (searchSelectedRooms.length > 0 && slots.length > 0) {
+        const roomOccupied = []; // 選んだ部屋ごとの予約時間帯
+        searchSelectedRooms.forEach(rid => {
+          const occ = allRoomRes
+            .filter(r => r.date === dk && r.room_id === rid)
+            .map(r => {
+              const [rsh, rsm] = r.start_time.split(':').map(Number);
+              const [reh, rem] = r.end_time.split(':').map(Number);
+              return { start: rsh * 60 + rsm, end: reh * 60 + rem };
+            });
+          // ブロックも部屋占有に追加
+          blocks.filter(b => b.date === dk && b.block_room_ids.includes(rid)).forEach(b => {
+            const [bsh, bsm] = b.start_time.split(':').map(Number);
+            const [beh, bem] = b.end_time.split(':').map(Number);
+            occ.push({ start: bsh * 60 + bsm, end: beh * 60 + bem });
+          });
+          roomOccupied.push({ rid, occ });
+        });
+        // スロットごとに、いずれかの部屋が空いてるか確認
+        const filtered = slots.filter(t => {
+          return roomOccupied.some(ro => {
+            return !ro.occ.some(o => t < o.end && t + duration > o.start);
+          });
+        });
+        slots.length = 0;
+        filtered.forEach(t => slots.push(t));
       }
 
       if (slots.length > 0) {
