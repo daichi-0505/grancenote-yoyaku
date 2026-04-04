@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2C3E6B">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>予約帳 - グランセノーテ</title>
+<style>
+:root {
+  --bg-primary:     #F5F6FA;
+  --bg-card:        #FFFFFF;
+  --border-default: #E8EAF0;
+  --border-focus:   #2C3E6B;
+  --text-primary:   #2D3142;
+  --text-secondary: #6B7280;
+  --text-muted:     #9CA3AF;
+  --accent:         #2C3E6B;
+  --accent-light:   #4A6FA5;
+  --accent-glow:    rgba(44,62,107,0.10);
+  --success:        #10B981;
+  --warning:        #F59E0B;
+  --danger:         #EF4444;
+  --gradient-cta:   linear-gradient(135deg, #2C3E6B 0%, #4A6FA5 100%);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: -apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;
+  background: var(--bg-primary); overflow: hidden;
+  height: 100dvh; display: flex; flex-direction: column;
+  color: var(--text-primary);
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* ── Loading ── */
+.loading-overlay {
+  position: fixed; inset: 0; background: var(--bg-primary);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 999; gap: 16px;
+}
+.loading-overlay.hidden { display: none; }
+.spinner {
+  width: 36px; height: 36px; border: 3px solid var(--border-default);
+  border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--text-muted); font-weight: 600; }
+.sync-indicator {
+  position: fixed; top: var(--safe-top); left: 0; right: 0; height: 3px;
+  background: var(--accent-light); z-index: 500;
+  animation: syncPulse 1s ease-in-out infinite; display: none;
+}
+.sync-indicator.active { display: block; }
+@keyframes syncPulse { 0%,100% { opacity: .3; } 50% { opacity: 1; } }
+.offline-banner {
+  background: var(--warning); color: #fff; text-align: center;
+  padding: 4px 8px; font-size: 12px; font-weight: 700; display: none;
+}
+.offline-banner.active { display: block; }
+
+/* ── Header ── */
+.header {
+  background: var(--bg-card);
+  padding: 10px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; z-index: 100;
+  border-bottom: 2px solid var(--border-default);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  gap: 8px; flex-wrap: wrap;
+}
+.header-left { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.header-date { font-size: 20px; font-weight: 900; color: var(--accent); letter-spacing: 1px; white-space: nowrap; }
+.header-dow { font-size: 16px; font-weight: 800; margin-left: 2px; }
+.nav-btn {
+  width: 36px; height: 36px; border: 1.5px solid var(--border-default); border-radius: 10px;
+  background: var(--bg-card); color: var(--accent); font-size: 18px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: all .15s; flex-shrink: 0;
+}
+.nav-btn:active { background: var(--accent-glow); border-color: var(--accent); }
+.today-btn {
+  padding: 6px 14px; border: 1.5px solid var(--accent); border-radius: 10px;
+  background: var(--bg-card); color: var(--accent); font-size: 13px; font-weight: 800;
+  cursor: pointer; letter-spacing: 1px; transition: all .15s; flex-shrink: 0;
+}
+.today-btn:active { background: var(--accent); color: #fff; }
+.header-right { display: flex; gap: 6px; flex-shrink: 0; }
+.settings-btn {
+  padding: 6px 12px; border: 1.5px solid var(--border-default); border-radius: 10px;
+  background: var(--bg-card); color: var(--text-primary); font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 4px; cursor: pointer; flex-shrink: 0;
+}
+.settings-btn:active { background: var(--accent-glow); }
+.refresh-btn {
+  padding: 6px 10px; border: 1.5px solid var(--border-default); border-radius: 10px;
+  background: var(--bg-card); color: var(--text-primary); font-size: 16px;
+  cursor: pointer; flex-shrink: 0;
+}
+.refresh-btn:active { background: var(--accent-glow); }
+
+/* ── Closed day ── */
+.closed-day {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 800; color: var(--text-muted); background: var(--bg-primary); gap: 8px;
+}
+.closed-sub { font-size: 13px; font-weight: 600; }
+
+/* ── Checklist ── */
+.checklist-bar {
+  background: var(--bg-card); border-bottom: 1px solid var(--border-default);
+  padding: 6px 16px; display: flex; gap: 16px; flex-shrink: 0; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.check-item {
+  display: flex; align-items: center; gap: 5px; font-size: 13px;
+  color: var(--text-primary); font-weight: 700; white-space: nowrap; cursor: pointer;
+}
+.check-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+
+/* ── Grid ── */
+.grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.grid-table { flex: 1; display: flex; flex-direction: column; width: 100%; }
+
+/* Memo space */
+.memo-space {
+  flex-shrink: 0; height: 50px; background: var(--bg-card);
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* Time header */
+.time-header-row {
+  display: flex; flex-shrink: 0; height: 22px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-card);
+}
+.corner-cell {
+  flex-shrink: 0; border-right: 1px solid var(--border-default);
+  background: var(--bg-card);
+}
+.time-header-cells { flex: 1; display: flex; position: relative; margin-right: 8px; }
+.hour-block {
+  position: absolute; bottom: 0; height: 100%;
+  display: flex; align-items: flex-end; justify-content: center;
+  font-size: 11px; font-weight: 800; color: var(--text-primary); letter-spacing: 0.5px;
+  transform: translateX(-50%); padding-bottom: 2px;
+}
+
+/* Room rows */
+.room-row {
+  display: flex; flex: 1; min-height: 32px;
+  border-bottom: 1px solid var(--border-default);
+}
+.room-row.section-divider { border-top: 2.5px solid var(--accent); }
+.room-label {
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border-default);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 2px 6px; font-size: 13px; font-weight: 800; color: var(--text-primary);
+  border-left: 3px solid var(--accent);
+  overflow: hidden;
+}
+.room-sublabel { font-size: 10px; color: var(--text-secondary); font-weight: 700; }
+.time-cells { flex: 1; position: relative; background: var(--bg-card); margin-right: 8px; }
+
+/* Grid lines */
+.grid-line {
+  position: absolute; top: 0; bottom: 0; width: 0;
+  pointer-events: none; z-index: 1;
+}
+.grid-line.hour { border-left: 1px solid rgba(44,62,107,0.15); }
+.grid-line.quarter { border-left: 1px solid var(--border-default); }
+.grid-line.half { border-left: 1px dashed rgba(44,62,107,0.10); }
+.grid-line.end { border-left: 1.5px solid var(--accent); }
+
+/* Reservations */
+.reservation {
+  position: absolute; top: 2px; bottom: 2px;
+  border-radius: 5px; padding: 2px 4px;
+  cursor: pointer; z-index: 3; overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.08);
+  display: flex; flex-direction: column; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: transform .1s;
+}
+.reservation:active { transform: scale(0.98); }
+.res-top { display: flex; align-items: center; gap: 3px; }
+.res-menu-label {
+  font-size: 10px; font-weight: 800; color: #fff;
+  background: rgba(0,0,0,0.2); padding: 1px 4px; border-radius: 3px;
+  line-height: 1.4; white-space: nowrap;
+}
+.res-memo-tag {
+  font-size: 9px; font-weight: 700; color: rgba(0,0,0,0.5);
+  background: rgba(255,255,255,0.5); padding: 0 3px; border-radius: 3px;
+}
+.res-name { font-size: 12px; font-weight: 800; color: var(--text-primary); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Now line */
+.now-line {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--danger); z-index: 4; pointer-events: none;
+}
+.now-line::before {
+  content: ''; position: absolute; top: -3px; left: -3px;
+  width: 8px; height: 8px; background: var(--danger); border-radius: 50%;
+}
+
+/* Click overlay */
+.click-overlay { position: absolute; inset: 0; z-index: 2; cursor: pointer; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200;
+  display: none; align-items: flex-end; justify-content: center; padding: 0;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--bg-card); border-radius: 16px 16px 0 0; width: 100%; max-width: 500px;
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+  border: 1px solid var(--border-default);
+  padding-bottom: var(--safe-bottom);
+}
+.modal-header {
+  padding: 14px 16px; border-bottom: 1px solid var(--border-default);
+  display: flex; justify-content: space-between; align-items: center;
+  border-left: 4px solid var(--accent); position: sticky; top: 0;
+  background: var(--bg-card); z-index: 1;
+}
+.modal-title { font-size: 15px; font-weight: 900; color: var(--accent); letter-spacing: 1px; }
+.modal-close {
+  width: 28px; height: 28px; border: 1px solid var(--border-default);
+  background: var(--bg-primary); border-radius: 8px; font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-muted);
+}
+.modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.form-group { display: flex; flex-direction: column; gap: 3px; }
+.form-group label { font-size: 11px; font-weight: 800; color: var(--text-secondary); letter-spacing: 1px; text-transform: uppercase; }
+.form-group input, .form-group select {
+  padding: 10px 12px; border: 1.5px solid var(--border-default); border-radius: 8px;
+  font-size: 16px; background: var(--bg-card); color: var(--text-primary);
+  font-weight: 600; -webkit-appearance: none; transition: border-color .15s;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.form-row { display: flex; gap: 8px; }
+.form-row .form-group { flex: 1; }
+.modal-footer { padding: 10px 16px; border-top: 1px solid var(--border-default); display: flex; gap: 8px; }
+.btn {
+  flex: 1; padding: 12px; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 800; cursor: pointer; letter-spacing: 1px;
+  transition: opacity .15s;
+}
+.btn:active { opacity: 0.8; }
+.btn-primary { background: var(--gradient-cta); color: #fff; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-cancel { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border-default); }
+
+/* ── Settings ── */
+.settings-list { list-style: none; }
+.settings-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-default); gap: 8px; }
+.settings-item:last-child { border: none; }
+.staff-color-dot { width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(0,0,0,0.06); flex-shrink: 0; }
+.staff-name-input { border: none; font-size: 14px; font-weight: 700; flex: 1; outline: none; min-width: 0; color: var(--text-primary); }
+.color-input { width: 32px; height: 26px; border: none; cursor: pointer; background: none; flex-shrink: 0; }
+.add-btn {
+  width: 100%; padding: 8px; border: 2px dashed var(--border-default); border-radius: 10px;
+  background: none; font-size: 13px; font-weight: 700; color: var(--text-muted); cursor: pointer; margin-top: 8px;
+}
+.add-btn:active { background: var(--accent-glow); }
+.delete-staff-btn {
+  width: 24px; height: 24px; border: none; background: rgba(239,68,68,0.08);
+  border-radius: 6px; color: var(--danger); font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+}
+.settings-tabs { display: flex; border-bottom: 1px solid var(--border-default); }
+.settings-tab {
+  flex: 1; padding: 8px; text-align: center; font-size: 12px; font-weight: 800;
+  border: none; background: none; cursor: pointer; color: var(--text-muted);
+  border-bottom: 2px solid transparent; letter-spacing: 1px;
+}
+.settings-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
+.room-name-input { border: none; font-size: 14px; font-weight: 700; flex: 1; outline: none; min-width: 0; color: var(--text-primary); }
+.room-sub-input { border: none; font-size: 11px; color: var(--text-muted); width: 50px; outline: none; flex-shrink: 0; font-weight: 600; }
+
+/* ── Responsive ── */
+@media (min-width: 1024px) {
+  .header { padding: 12px 24px; }
+  .header-date { font-size: 24px; }
+  .header-dow { font-size: 18px; }
+  .room-label { font-size: 15px; padding: 4px 10px; }
+  .hour-block { font-size: 13px; }
+  .reservation { top: 3px; bottom: 3px; padding: 3px 6px; }
+  .res-name { font-size: 14px; }
+  .res-menu-label { font-size: 11px; }
+  .modal-overlay { align-items: center; padding: 16px; }
+  .modal { border-radius: 16px; max-width: 420px; }
+}
+
+@media (max-width: 480px) {
+  .header { padding: 6px 10px; gap: 4px; }
+  .header-date { font-size: 16px; }
+  .header-dow { font-size: 13px; }
+  .nav-btn { width: 32px; height: 32px; font-size: 16px; }
+  .today-btn { padding: 5px 10px; font-size: 11px; }
+  .settings-btn { padding: 5px 8px; font-size: 11px; }
+  .refresh-btn { padding: 5px 8px; font-size: 14px; }
+  .room-label { font-size: 11px; padding: 2px 4px; }
+  .room-sublabel { font-size: 9px; }
+  .hour-block { font-size: 10px; }
+  .checklist-bar { padding: 4px 10px; gap: 12px; }
+  .check-item { font-size: 12px; }
+  .memo-space { height: 40px; }
+  .res-name { font-size: 11px; }
+  .res-menu-label { font-size: 9px; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .header { padding: 4px 12px; }
+  .header-date { font-size: 15px; }
+  .header-dow { font-size: 12px; }
+  .nav-btn { width: 28px; height: 28px; font-size: 14px; }
+  .today-btn { padding: 4px 8px; font-size: 11px; }
+  .checklist-bar { padding: 3px 10px; }
+  .check-item { font-size: 11px; }
+  .memo-space { height: 30px; }
+  .room-label { font-size: 11px; min-height: 0; }
+  .room-row { min-height: 28px; }
+  .time-header-row { height: 18px; }
+  .hour-block { font-size: 9px; }
+}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">読み込み中...</div>
+</div>
+<div class="sync-indicator" id="syncIndicator"></div>
+<div class="offline-banner" id="offlineBanner">オフライン - データの保存ができません</div>
+
+<div class="header">
+  <div class="header-left">
+    <button class="nav-btn" id="prevDay">&#8249;</button>
+    <div>
+      <span class="header-date" id="dateDisplay"></span>
+      <span class="header-dow" id="dowDisplay"></span>
+    </div>
+    <button class="nav-btn" id="nextDay">&#8250;</button>
+    <button class="today-btn" id="todayBtn">今日</button>
+  </div>
+  <div class="header-right">
+    <button class="refresh-btn" id="refreshBtn" title="再読込">&#x21bb;</button>
+    <button class="settings-btn" id="settingsBtn">&#9881; 設定</button>
+  </div>
+</div>
+
+<div class="checklist-bar" id="checklistBar"></div>
+<div class="memo-space"></div>
+<div class="grid-wrapper" id="gridWrapper"></div>
+
+<!-- Reservation Modal -->
+<div class="modal-overlay" id="reservationModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">予約を追加</span>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>お客様名</label><input type="text" id="resName" placeholder="山田 花子 様" autocomplete="off"></div>
+      <div class="form-group"><label>メニュー</label><input type="text" id="resMenu" placeholder="フェイシャル" value="フェイシャル" autocomplete="off"></div>
+      <div class="form-group"><label>担当スタッフ</label><select id="resStaff"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>開始</label><select id="resStart"></select></div>
+        <div class="form-group"><label>終了</label><select id="resEnd"></select></div>
+      </div>
+      <div class="form-group"><label>部屋</label><select id="resRoom"></select></div>
+      <div class="form-group"><label>メモ</label><input type="text" id="resMemo" placeholder="新規、ホトペ、など" autocomplete="off"></div>
+    </div>
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveReservation()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">設定</span>
+      <button class="modal-close" id="settingsClose">&times;</button>
+    </div>
+    <div class="settings-tabs">
+      <button class="settings-tab active" data-tab="staff">スタッフ</button>
+      <button class="settings-tab" data-tab="rooms">部屋</button>
+      <button class="settings-tab" data-tab="checklist">チェック欄</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-panel active" id="staffPanel"></div>
+      <div class="settings-panel" id="roomsPanel"></div>
+      <div class="settings-panel" id="checklistPanel"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── GAS API設定 ──
+// デプロイ後にここを書き換える
+const API_URL = '%%GAS_DEPLOY_URL%%';
+
+// ── デフォルトデータ（API未接続時のフォールバック） ──
+const DEFAULT_STAFF = [
+  { id: 's1', name: '峯 琴音', color: '#FFE082' },
+  { id: 's2', name: 'リン ション', color: '#F8BBD0' },
+  { id: 's3', name: '西村 由維', color: '#C8E6C9' },
+  { id: 's4', name: '峯 敏絵', color: '#B3E5FC' },
+  { id: 's5', name: '林 美志', color: '#E1BEE7' },
+  { id: 's6', name: '黒岩 結花', color: '#FFE0B2' },
+  { id: 's7', name: '福山 結子', color: '#B2DFDB' },
+  { id: 's8', name: '藤原 嘉子', color: '#F0F4C3' },
+];
+const DEFAULT_ROOMS = [
+  { id: 'r1', name: 'フェイシャル①', sub: '' },
+  { id: 'r2', name: 'フェイシャル②', sub: '' },
+  { id: 'r3', name: 'ボディ③', sub: 'インディバ' },
+  { id: 'r4', name: 'ボディ④', sub: '' },
+  { id: 'r5', name: 'ボディ⑤', sub: '脱毛', divider: true },
+  { id: 'r6', name: 'ボディ⑥', sub: '' },
+  { id: 'r7', name: '備考', sub: '' },
+];
+const DEFAULT_CHECKS = [
+  { id: 'c1', label: 'ホトペブログ' },
+  { id: 'c2', label: 'ホームページブログ' },
+  { id: 'c3', label: '明日のセッティング・清掃終了場所' },
+];
+
+// ── 状態 ──
+let staff = [];
+let rooms = [];
+let checks = [];
+let dayReservations = [];
+let dayCheckStates = {};
+let currentDate = new Date(); currentDate.setHours(0,0,0,0);
+let useApi = API_URL && !API_URL.includes('%%');
+let syncing = false;
+
+const DOW = ['日','月','火','水','木','金','土'];
+function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+// ── API通信 ──
+function showSync(on) {
+  syncing = on;
+  document.getElementById('syncIndicator').classList.toggle('active', on);
+}
+
+async function apiGet(params) {
+  if (!useApi) return null;
+  const url = API_URL + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  return res.json();
+}
+
+async function apiPost(body) {
+  if (!useApi) return null;
+  showSync(true);
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  } finally {
+    showSync(false);
+  }
+}
+
+// ── LocalStorage（フォールバック用） ──
+function lsLoad(key, def) { try { const d = localStorage.getItem('rs_' + key); return d ? JSON.parse(d) : JSON.parse(JSON.stringify(def)); } catch { return JSON.parse(JSON.stringify(def)); } }
+function lsSave(key, data) { localStorage.setItem('rs_' + key, JSON.stringify(data)); }
+
+// ── データ読込 ──
+async function loadConfig() {
+  if (useApi) {
+    try {
+      const data = await apiGet({ action: 'getAll' });
+      if (data && data.ok) {
+        staff = data.staff;
+        rooms = data.rooms;
+        checks = data.checks;
+        return;
+      }
+    } catch (e) { console.warn('API error, falling back to localStorage', e); }
+  }
+  staff = lsLoad('staff', DEFAULT_STAFF);
+  rooms = lsLoad('rooms', DEFAULT_ROOMS);
+  checks = lsLoad('checks', DEFAULT_CHECKS);
+}
+
+async function loadDayData() {
+  const dk = dateKey(currentDate);
+  if (useApi) {
+    try {
+      const data = await apiGet({ action: 'getDay', date: dk });
+      if (data && data.ok) {
+        dayReservations = data.reservations;
+        dayCheckStates = data.checkStates;
+        return;
+      }
+    } catch (e) { console.warn('API error, falling back to localStorage', e); }
+  }
+  const allRes = lsLoad('reservations', {});
+  dayReservations = allRes[dk] || [];
+  dayCheckStates = (lsLoad('checkstates', {}))[dk] || {};
+}
+
+// ── 営業時間 ──
+function getBH(date) {
+  const dow = date.getDay();
+  if (dow === 0 || dow === 1) return null;
+  return dow === 6 ? { start: 9, end: 19 } : { start: 9, end: 18 };
+}
+
+function getTimeOpts(bh) {
+  const o = [];
+  for (let h = bh.start; h <= bh.end; h++)
+    for (let m = 0; m < 60; m += 15) { if (h === bh.end && m > 0) break; o.push(`${h}:${String(m).padStart(2,'0')}`); }
+  return o;
+}
+
+function getLabelW() {
+  const w = window.innerWidth;
+  if (w <= 480) return 60;
+  if (w <= 768) return 80;
+  return 120;
+}
+
+// ── レンダリング ──
+function renderHeader() {
+  const d = currentDate;
+  document.getElementById('dateDisplay').textContent = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+  const dow = DOW[d.getDay()];
+  const el = document.getElementById('dowDisplay');
+  el.textContent = `(${dow})`;
+  el.style.color = d.getDay() === 0 ? 'var(--danger)' : d.getDay() === 6 ? 'var(--accent-light)' : 'var(--text-secondary)';
+}
+
+function renderChecklist() {
+  const bar = document.getElementById('checklistBar');
+  bar.innerHTML = '';
+  checks.forEach(c => {
+    const lbl = document.createElement('label'); lbl.className = 'check-item';
+    const cb = document.createElement('input'); cb.type = 'checkbox';
+    cb.checked = !!dayCheckStates[c.id];
+    cb.addEventListener('change', () => {
+      dayCheckStates[c.id] = cb.checked;
+      if (useApi) {
+        apiPost({ action: 'saveCheckState', date: dateKey(currentDate), checkId: c.id, checked: cb.checked });
+      } else {
+        const all = lsLoad('checkstates', {});
+        if (!all[dateKey(currentDate)]) all[dateKey(currentDate)] = {};
+        all[dateKey(currentDate)][c.id] = cb.checked;
+        lsSave('checkstates', all);
+      }
+    });
+    const sp = document.createElement('span'); sp.textContent = c.label;
+    lbl.appendChild(cb); lbl.appendChild(sp); bar.appendChild(lbl);
+  });
+}
+
+function renderGrid() {
+  const wrapper = document.getElementById('gridWrapper');
+  const bh = getBH(currentDate);
+  if (!bh) {
+    wrapper.innerHTML = `<div class="closed-day"><span>定休日</span><span class="closed-sub">${DOW[currentDate.getDay()]}曜日</span></div>`;
+    return;
+  }
+
+  const labelW = getLabelW();
+  const totalH = bh.end - bh.start;
+
+  let html = '<div class="grid-table">';
+
+  // Time header
+  html += '<div class="time-header-row">';
+  html += `<div class="corner-cell" style="width:${labelW}px"></div>`;
+  html += '<div class="time-header-cells">';
+  for (let h = bh.start; h <= bh.end; h++) {
+    const pct = (h - bh.start) / totalH * 100;
+    html += `<div style="position:absolute;left:${pct}%;top:0;bottom:0;border-left:1px solid ${h === bh.start || h === bh.end ? 'var(--accent)' : 'rgba(44,62,107,0.15)'};pointer-events:none"></div>`;
+    html += `<div class="hour-block" style="left:${pct}%">${h}:00</div>`;
+  }
+  html += '</div></div>';
+
+  // Room rows
+  rooms.forEach(room => {
+    const dc = room.divider ? ' section-divider' : '';
+    html += `<div class="room-row${dc}">`;
+    html += `<div class="room-label" style="width:${labelW}px">${room.name}${room.sub ? '<span class="room-sublabel">'+room.sub+'</span>' : ''}</div>`;
+    html += `<div class="time-cells" data-room="${room.id}">`;
+
+    const totalQ = totalH * 4;
+    for (let q = 0; q <= totalQ; q++) {
+      const pct = q / totalQ * 100;
+      let cls = 'grid-line';
+      if (q === totalQ) cls += ' end';
+      else if (q % 4 === 0) cls += ' hour';
+      else if (q % 2 === 0) cls += ' half';
+      else cls += ' quarter';
+      html += `<div class="${cls}" style="left:${pct}%"></div>`;
+    }
+
+    html += `<div class="click-overlay" data-room="${room.id}"></div>`;
+
+    const rr = dayReservations.filter(r => r.roomId === room.id);
+    rr.forEach(res => {
+      const [sh,sm] = res.start.split(':').map(Number);
+      const [eh,em] = res.end.split(':').map(Number);
+      const sMin = (sh - bh.start) * 60 + sm;
+      const eMin = (eh - bh.start) * 60 + em;
+      const tMin = totalH * 60;
+      const left = sMin / tMin * 100;
+      const width = Math.max((eMin - sMin) / tMin * 100, 2);
+      const s = staff.find(st => st.id === res.staffId);
+      const bg = s ? s.color : '#e0e0e0';
+      html += `<div class="reservation" style="left:${left}%;width:${width}%;background:${bg}" data-id="${res.id}">`;
+      html += '<div class="res-top">';
+      if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
+      if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
+      html += '</div>';
+      html += `<span class="res-name">${res.name}</span>`;
+      html += '</div>';
+    });
+
+    const now = new Date();
+    if (dateKey(now) === dateKey(currentDate)) {
+      const nd = now.getHours() + now.getMinutes() / 60;
+      if (nd >= bh.start && nd <= bh.end) {
+        html += `<div class="now-line" style="left:${(nd - bh.start) / totalH * 100}%"></div>`;
+      }
+    }
+    html += '</div></div>';
+  });
+
+  html += '</div>';
+  wrapper.innerHTML = html;
+
+  // Events
+  wrapper.querySelectorAll('.click-overlay').forEach(ov => {
+    ov.addEventListener('click', e => {
+      const rect = ov.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      const clickMin = Math.round(pct * totalH * 60 / 15) * 15;
+      const h = bh.start + Math.floor(clickMin / 60);
+      const m = clickMin % 60;
+      openAddModal(ov.dataset.room, h, m, bh);
+    });
+  });
+  wrapper.querySelectorAll('.reservation').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const res = dayReservations.find(r => r.id === el.dataset.id);
+      if (res) openEditModal(res);
+    });
+  });
+}
+
+// ── Modals ──
+let editingRes = null;
+
+function populateTimeSelects(bh) {
+  const opts = getTimeOpts(bh);
+  ['resStart','resEnd'].forEach(id => {
+    document.getElementById(id).innerHTML = opts.map(t => `<option value="${t}">${t}</option>`).join('');
+  });
+}
+function populateStaffSelect() {
+  document.getElementById('resStaff').innerHTML = staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+}
+function populateRoomSelect(rid) {
+  document.getElementById('resRoom').innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id===rid?'selected':''}>${r.name}</option>`).join('');
+}
+
+function openAddModal(roomId, hour, mins, bh) {
+  editingRes = null;
+  document.getElementById('modalTitle').textContent = '予約を追加';
+  document.getElementById('resName').value = '';
+  document.getElementById('resMenu').value = 'フェイシャル';
+  document.getElementById('resMemo').value = '';
+  populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(roomId);
+  document.getElementById('resStart').value = `${hour}:${String(mins).padStart(2,'0')}`;
+  let eh = hour + 1, em = mins;
+  if (eh > bh.end || (eh === bh.end && em > 0)) { eh = bh.end; em = 0; }
+  document.getElementById('resEnd').value = `${eh}:${String(em).padStart(2,'0')}`;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveReservation()">保存</button>`;
+  document.getElementById('reservationModal').classList.add('active');
+}
+
+function openEditModal(res) {
+  const bh = getBH(currentDate); if (!bh) return;
+  editingRes = res;
+  document.getElementById('modalTitle').textContent = '予約を編集';
+  document.getElementById('resName').value = res.name;
+  document.getElementById('resMenu').value = res.menu || '';
+  document.getElementById('resMemo').value = res.memo || '';
+  populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(res.roomId);
+  document.getElementById('resStart').value = res.start;
+  document.getElementById('resEnd').value = res.end;
+  document.getElementById('resStaff').value = res.staffId;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn btn-danger" onclick="deleteReservation()">削除</button>
+    <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveReservation()">保存</button>`;
+  document.getElementById('reservationModal').classList.add('active');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+async function saveReservation() {
+  const name = document.getElementById('resName').value.trim();
+  if (!name) { alert('お客様名を入力してください'); return; }
+  const data = {
+    id: editingRes ? editingRes.id : 'r' + Date.now(),
+    date: dateKey(currentDate),
+    name,
+    menu: document.getElementById('resMenu').value.trim(),
+    staffId: document.getElementById('resStaff').value,
+    start: document.getElementById('resStart').value,
+    end: document.getElementById('resEnd').value,
+    roomId: document.getElementById('resRoom').value,
+    memo: document.getElementById('resMemo').value.trim(),
+  };
+
+  if (editingRes) {
+    dayReservations = dayReservations.map(r => r.id === editingRes.id ? data : r);
+  } else {
+    dayReservations.push(data);
+  }
+
+  closeModal('reservationModal');
+  renderGrid();
+
+  if (useApi) {
+    await apiPost({ action: 'saveReservation', reservation: data });
+  } else {
+    const allRes = lsLoad('reservations', {});
+    allRes[dateKey(currentDate)] = dayReservations;
+    lsSave('reservations', allRes);
+  }
+}
+
+async function deleteReservation() {
+  if (!editingRes) return;
+  if (!confirm(`${editingRes.name} の予約を削除しますか？`)) return;
+  const id = editingRes.id;
+  dayReservations = dayReservations.filter(r => r.id !== id);
+  closeModal('reservationModal');
+  renderGrid();
+
+  if (useApi) {
+    await apiPost({ action: 'deleteReservation', id });
+  } else {
+    const allRes = lsLoad('reservations', {});
+    allRes[dateKey(currentDate)] = dayReservations;
+    lsSave('reservations', allRes);
+  }
+}
+
+// ── Settings ──
+function openSettings() { renderStaffSettings(); renderRoomSettings(); renderChecklistSettings(); document.getElementById('settingsModal').classList.add('active'); }
+
+function renderStaffSettings() {
+  const p = document.getElementById('staffPanel'); p.innerHTML = '';
+  const ul = document.createElement('ul'); ul.className = 'settings-list';
+  staff.forEach((s,i) => {
+    const li = document.createElement('li'); li.className = 'settings-item';
+    li.innerHTML = `<div class="staff-color-dot" style="background:${s.color}"></div>
+      <input class="staff-name-input" value="${s.name}" data-idx="${i}" placeholder="スタッフ名">
+      <input type="color" class="color-input" value="${s.color}" data-idx="${i}">
+      <button class="delete-staff-btn" data-idx="${i}">&times;</button>`;
+    ul.appendChild(li);
+  }); p.appendChild(ul);
+  p.querySelectorAll('.staff-name-input').forEach(inp => { inp.addEventListener('change', e => { staff[e.target.dataset.idx].name = e.target.value; saveStaffConfig(); }); });
+  p.querySelectorAll('.color-input').forEach(inp => { inp.addEventListener('input', e => { staff[e.target.dataset.idx].color = e.target.value; e.target.closest('.settings-item').querySelector('.staff-color-dot').style.background = e.target.value; saveStaffConfig(); }); });
+  p.querySelectorAll('.delete-staff-btn').forEach(btn => { btn.addEventListener('click', e => { const i=parseInt(e.target.dataset.idx); if(confirm(`${staff[i].name}を削除？`)){staff.splice(i,1);saveStaffConfig();renderStaffSettings();} }); });
+  const ab = document.createElement('button'); ab.className = 'add-btn'; ab.textContent = '+ スタッフを追加';
+  ab.addEventListener('click', () => { const c=['#FFE082','#F8BBD0','#C8E6C9','#B3E5FC','#E1BEE7','#FFE0B2','#B2DFDB','#F0F4C3']; staff.push({id:'s'+Date.now(),name:'新しいスタッフ',color:c[staff.length%c.length]}); saveStaffConfig(); renderStaffSettings(); });
+  p.appendChild(ab);
+}
+
+function renderRoomSettings() {
+  const p = document.getElementById('roomsPanel'); p.innerHTML = '';
+  const ul = document.createElement('ul'); ul.className = 'settings-list';
+  rooms.forEach((r,i) => {
+    const li = document.createElement('li'); li.className = 'settings-item';
+    li.innerHTML = `<input class="room-name-input" value="${r.name}" data-idx="${i}" placeholder="部屋名">
+      <input class="room-sub-input" value="${r.sub||''}" data-idx="${i}" placeholder="サブ">
+      <button class="delete-staff-btn" data-idx="${i}">&times;</button>`;
+    ul.appendChild(li);
+  }); p.appendChild(ul);
+  p.querySelectorAll('.room-name-input').forEach(inp => { inp.addEventListener('change', e => { rooms[e.target.dataset.idx].name=e.target.value; saveRoomConfig(); }); });
+  p.querySelectorAll('.room-sub-input').forEach(inp => { inp.addEventListener('change', e => { rooms[e.target.dataset.idx].sub=e.target.value; saveRoomConfig(); }); });
+  p.querySelectorAll('.delete-staff-btn').forEach(btn => { btn.addEventListener('click', e => { const i=parseInt(e.target.dataset.idx); if(confirm(`${rooms[i].name}を削除？`)){rooms.splice(i,1);saveRoomConfig();renderRoomSettings();} }); });
+  const ab = document.createElement('button'); ab.className = 'add-btn'; ab.textContent = '+ 部屋を追加';
+  ab.addEventListener('click', () => { rooms.push({id:'r'+Date.now(),name:'新しい部屋',sub:''}); saveRoomConfig(); renderRoomSettings(); });
+  p.appendChild(ab);
+}
+
+function renderChecklistSettings() {
+  const p = document.getElementById('checklistPanel'); p.innerHTML = '';
+  const ul = document.createElement('ul'); ul.className = 'settings-list';
+  checks.forEach((c,i) => {
+    const li = document.createElement('li'); li.className = 'settings-item';
+    li.innerHTML = `<input class="staff-name-input" value="${c.label}" data-idx="${i}" placeholder="チェック項目">
+      <button class="delete-staff-btn" data-idx="${i}">&times;</button>`;
+    ul.appendChild(li);
+  }); p.appendChild(ul);
+  p.querySelectorAll('.staff-name-input').forEach(inp => { inp.addEventListener('change', e => { checks[e.target.dataset.idx].label=e.target.value; saveCheckConfig(); }); });
+  p.querySelectorAll('.delete-staff-btn').forEach(btn => { btn.addEventListener('click', e => { checks.splice(parseInt(e.target.dataset.idx),1); saveCheckConfig(); renderChecklistSettings(); }); });
+  const ab = document.createElement('button'); ab.className = 'add-btn'; ab.textContent = '+ チェック項目を追加';
+  ab.addEventListener('click', () => { checks.push({id:'c'+Date.now(),label:'新しい項目'}); saveCheckConfig(); renderChecklistSettings(); });
+  p.appendChild(ab);
+}
+
+async function saveStaffConfig() {
+  if (useApi) {
+    const list = staff.map((s,i) => ({ ...s, sortOrder: i }));
+    await apiPost({ action: 'saveStaff', staff: list });
+  } else { lsSave('staff', staff); }
+}
+async function saveRoomConfig() {
+  if (useApi) {
+    const list = rooms.map((r,i) => ({ ...r, divider: r.divider ? 'true' : '', sortOrder: i }));
+    await apiPost({ action: 'saveRooms', rooms: list });
+  } else { lsSave('rooms', rooms); }
+}
+async function saveCheckConfig() {
+  if (useApi) {
+    const list = checks.map((c,i) => ({ ...c, sortOrder: i }));
+    await apiPost({ action: 'saveChecks', checks: list });
+  } else { lsSave('checks', checks); }
+}
+
+// ── イベント ──
+document.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab+'Panel').classList.add('active');
+  });
+});
+
+async function changeDate(offset) {
+  currentDate.setDate(currentDate.getDate() + offset);
+  renderHeader();
+  await loadDayData();
+  renderChecklist();
+  renderGrid();
+}
+
+document.getElementById('prevDay').addEventListener('click', () => changeDate(-1));
+document.getElementById('nextDay').addEventListener('click', () => changeDate(1));
+document.getElementById('todayBtn').addEventListener('click', async () => {
+  currentDate = new Date(); currentDate.setHours(0,0,0,0);
+  renderHeader();
+  await loadDayData();
+  renderChecklist();
+  renderGrid();
+});
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('settingsClose').addEventListener('click', () => { closeModal('settingsModal'); renderAll(); });
+document.getElementById('modalClose').addEventListener('click', () => closeModal('reservationModal'));
+document.getElementById('refreshBtn').addEventListener('click', async () => {
+  await loadConfig();
+  await loadDayData();
+  renderAll();
+});
+
+['reservationModal','settingsModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => { if(e.target===document.getElementById(id)) closeModal(id); });
+});
+
+// Now line update
+setInterval(() => { if(dateKey(new Date())===dateKey(currentDate)) renderGrid(); }, 60000);
+// Auto refresh from server every 2 minutes
+setInterval(async () => { if(useApi) { await loadDayData(); renderChecklist(); renderGrid(); } }, 120000);
+
+window.addEventListener('resize', () => renderGrid());
+
+// Offline detection
+window.addEventListener('online', () => document.getElementById('offlineBanner').classList.remove('active'));
+window.addEventListener('offline', () => document.getElementById('offlineBanner').classList.add('active'));
+
+// Swipe navigation
+let touchStartX = 0;
+document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+document.addEventListener('touchend', e => {
+  if (document.querySelector('.modal-overlay.active')) return;
+  const diff = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(diff) > 80) changeDate(diff > 0 ? -1 : 1);
+}, { passive: true });
+
+// ── 初期化 ──
+function renderAll() { renderHeader(); renderChecklist(); renderGrid(); }
+
+async function init() {
+  await loadConfig();
+  await loadDayData();
+  renderAll();
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+init();
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
