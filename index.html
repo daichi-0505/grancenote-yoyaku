@@ -351,11 +351,35 @@ body {
   border: none; border-bottom: 5px solid var(--res-color, #888);
   background: transparent; border-radius: 0;
 }
+.reservation.type-practice {
+  border: none; background: transparent; border-radius: 0;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding-bottom: 0;
+}
+.practice-lines {
+  display: flex; flex-direction: column; gap: 1px; position: absolute; bottom: 2px; left: 0; right: 0;
+}
+.practice-line {
+  height: 4px; border-radius: 2px;
+}
 .reservation.type-shopping {
   border: 2px solid var(--res-color, #888);
   background: rgba(255,255,255,0.85);
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
+.practice-menu-selector { display: flex; flex-wrap: wrap; gap: 6px; }
+.practice-menu-btn {
+  padding: 8px 12px; border: 2px solid var(--border-default); border-radius: 8px;
+  background: var(--bg-card); font-size: 13px; font-weight: 700; color: var(--text-secondary); cursor: pointer;
+}
+.practice-menu-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.practice-staff-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+.practice-staff-check {
+  display: flex; align-items: center; gap: 4px; padding: 6px 10px; border: 2px solid var(--border-default);
+  border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.practice-staff-check input { width: 16px; height: 16px; }
+.practice-staff-check.checked { border-color: var(--accent); background: var(--accent-glow); }
 .reservation.no-staff {
   border-color: #9CA3AF !important;
   background: rgba(200,200,200,0.3) !important;
@@ -609,13 +633,23 @@ body {
         <button class="type-btn active" data-type="treatment">施術</button>
         <button class="type-btn" data-type="break">休憩</button>
         <button class="type-btn" data-type="task">業務</button>
+        <button class="type-btn" data-type="practice">練習</button>
         <button class="type-btn" data-type="shopping">🛒 買い物</button>
       </div>
       <div id="treatmentFields">
         <div class="form-group"><label>お客様名</label><input type="text" id="resName" placeholder="山田 花子 様" autocomplete="off"></div>
         <div class="form-group"><label>メニュー</label><input type="text" id="resMenu" placeholder="フェイシャル" value="フェイシャル" autocomplete="off"></div>
       </div>
-      <div class="form-group"><label>担当スタッフ</label><select id="resStaff"></select></div>
+      <div id="practiceFields" style="display:none">
+        <div class="form-group"><label>練習内容</label>
+          <div class="practice-menu-selector" id="practiceMenuSelector"></div>
+          <input type="text" id="practiceMenuCustom" placeholder="その他（自由記入）" autocomplete="off" style="margin-top:6px">
+        </div>
+        <div class="form-group"><label>参加スタッフ（複数選択可）</label>
+          <div id="practiceStaffChecks" class="practice-staff-checks"></div>
+        </div>
+      </div>
+      <div id="singleStaffField" class="form-group"><label>担当スタッフ</label><select id="resStaff"></select></div>
       <div class="form-row">
         <div class="form-group"><label id="labelStart">施術開始</label><select id="resStart"></select></div>
         <div class="form-group"><label id="labelEnd">施術終了</label><select id="resEnd"></select></div>
@@ -859,6 +893,7 @@ async function syncDayDataFromApi() {
         aftercareEnd: r.aftercare_end || null,
         aftercareStaffId: r.aftercare_staff_id || null,
         subAssignments: r.sub_assignments ? (typeof r.sub_assignments === 'string' ? JSON.parse(r.sub_assignments) : r.sub_assignments) : null,
+        practiceStaffIds: r.practice_staff_ids ? (typeof r.practice_staff_ids === 'string' ? JSON.parse(r.practice_staff_ids) : r.practice_staff_ids) : null,
       }));
       const allRes = lsLoad('reservations', {});
       allRes[dk] = dayReservations;
@@ -1297,8 +1332,8 @@ function renderGrid() {
       }
 
       // 予約枠（背景+文字、タップ可能）
-      if (type === 'break' || type === 'task') {
-        // 休憩・業務はタップで新規追加（stopPropagationしない）、長押しで編集
+      if (type === 'break' || type === 'practice') {
+        // 休憩・練習はタップで新規追加（stopPropagationしない）、長押しで編集
         html += `<div class="${cls}" style="${style}" data-id="${res.id}" data-type="${type}">`;
       } else {
         html += `<div class="${cls}" style="${style}" data-id="${res.id}" onclick="event.stopPropagation();openViewModal(dayReservations.find(r=>r.id==='${res.id}'))">`;
@@ -1306,7 +1341,7 @@ function renderGrid() {
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
       html += `<span class="res-time-label">${res.start}〜</span>`;
-      if (type !== 'break' && type !== 'task') {
+      if (type !== 'break' && type !== 'task' && type !== 'practice') {
         if (noStaff) {
           html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
         } else {
@@ -1315,13 +1350,25 @@ function renderGrid() {
       }
       html += '</div>';
       html += '<div class="res-bottom">';
-      if (type !== 'treatment' && type !== 'shopping') {
-        const typeLabels = { break: '休憩', task: '業務', shopping: '🛒' };
-        html += `<span class="res-type-tag">${typeLabels[type] || type}</span>`;
+      if (type === 'break' || type === 'task') {
+        const typeLabels = { break: '休憩', task: '業務' };
+        html += `<span class="res-type-tag">${typeLabels[type]}</span>`;
+      } else if (type === 'practice') {
+        html += `<span class="res-type-tag">練習</span>`;
+        if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       }
-      if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
+      if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
+      // 練習: 参加スタッフの色線を並行表示
+      if (type === 'practice' && res.practiceStaffIds && res.practiceStaffIds.length > 0) {
+        html += '<div class="practice-lines">';
+        res.practiceStaffIds.forEach(sid => {
+          const ps = staff.find(st => st.id === sid);
+          if (ps) html += `<div class="practice-line" style="background:${ps.color}"></div>`;
+        });
+        html += '</div>';
+      }
       html += '</div>';
       // アフターケア線（予約枠の外、time-cells上に直接配置）
       if (res.aftercareEnd && type === 'treatment') {
@@ -1351,14 +1398,14 @@ function renderGrid() {
 
   // Events: 空白タップで新規追加
   wrapper.querySelectorAll('.time-cells').forEach(tc => {
-    // 長押しで休憩・業務の編集
+    // 長押しで休憩・練習の編集
     let longPressTimer = null;
     let longPressed = false;
     tc.addEventListener('pointerdown', function(e) {
       const resEl = e.target.closest('[data-id]');
       if (!resEl) return;
       const res = dayReservations.find(r => r.id === resEl.dataset.id);
-      if (!res || (res.type !== 'break' && res.type !== 'task')) return;
+      if (!res || (res.type !== 'break' && res.type !== 'practice')) return;
       longPressed = false;
       longPressTimer = setTimeout(() => {
         longPressed = true;
@@ -1373,7 +1420,7 @@ function renderGrid() {
       const resEl = e.target.closest('[data-id]');
       if (resEl) {
         const res = dayReservations.find(r => r.id === resEl.dataset.id);
-        if (res && (res.type === 'treatment' || res.type === 'shopping')) return;
+        if (res && res.type !== 'break' && res.type !== 'practice') return;
       }
       const rect = tc.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
@@ -1394,12 +1441,15 @@ function setType(type) {
   document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
   const isTreatment = type === 'treatment';
   const isShopping = type === 'shopping';
+  const isPractice = type === 'practice';
   document.getElementById('treatmentFields').style.display = (isTreatment || isShopping) ? '' : 'none';
+  document.getElementById('practiceFields').style.display = isPractice ? '' : 'none';
+  document.getElementById('singleStaffField').style.display = isPractice ? 'none' : '';
   document.getElementById('aftercareFields').style.display = isTreatment ? '' : 'none';
   document.getElementById('checkinField').style.display = isTreatment ? '' : 'none';
   document.getElementById('detailToggle').style.display = isTreatment ? '' : 'none';
   // ラベル変更
-  const labelMap = { treatment: ['施術開始','施術終了'], break: ['開始','終了'], task: ['開始','終了'], shopping: ['開始','終了'] };
+  const labelMap = { treatment: ['施術開始','施術終了'], break: ['開始','終了'], task: ['開始','終了'], practice: ['開始','終了'], shopping: ['開始','終了'] };
   document.getElementById('labelStart').textContent = labelMap[type][0];
   document.getElementById('labelEnd').textContent = labelMap[type][1];
   if (!isTreatment && !isShopping) {
@@ -1407,6 +1457,44 @@ function setType(type) {
   } else {
     document.getElementById('resName').placeholder = '山田 花子 様';
   }
+  if (isPractice) populatePracticeFields();
+}
+
+const PRACTICE_MENUS = ['フェイシャル', 'インディバ', 'コルギ', 'クロージング'];
+let selectedPracticeMenu = '';
+
+function populatePracticeFields() {
+  // メニュー選択
+  const menuEl = document.getElementById('practiceMenuSelector');
+  menuEl.innerHTML = PRACTICE_MENUS.map(m =>
+    `<button type="button" class="practice-menu-btn${selectedPracticeMenu === m ? ' active' : ''}" data-menu="${m}">${m}</button>`
+  ).join('');
+  menuEl.querySelectorAll('.practice-menu-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedPracticeMenu = selectedPracticeMenu === btn.dataset.menu ? '' : btn.dataset.menu;
+      if (selectedPracticeMenu) document.getElementById('practiceMenuCustom').value = '';
+      populatePracticeFields();
+    });
+  });
+  document.getElementById('practiceMenuCustom').addEventListener('input', function() {
+    if (this.value) { selectedPracticeMenu = ''; menuEl.querySelectorAll('.practice-menu-btn').forEach(b => b.classList.remove('active')); }
+  });
+  // スタッフチェックボックス
+  const checksEl = document.getElementById('practiceStaffChecks');
+  const prevChecked = Array.from(checksEl.querySelectorAll('input:checked')).map(i => i.value);
+  checksEl.innerHTML = staff.map(s => {
+    const checked = prevChecked.includes(s.id) ? 'checked' : '';
+    return `<label class="practice-staff-check${checked ? ' checked' : ''}">
+      <input type="checkbox" value="${s.id}" ${checked}>
+      <span class="staff-color-dot" style="background:${s.color};width:12px;height:12px;border-radius:50%;display:inline-block"></span>
+      ${s.name.split(' ')[0]}
+    </label>`;
+  }).join('');
+  checksEl.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      inp.closest('.practice-staff-check').classList.toggle('checked', inp.checked);
+    });
+  });
 }
 
 // 種別選択イベント
@@ -1524,12 +1612,12 @@ function openAddModal(roomId, hour, mins, bh) {
 function openViewModal(res) {
   const s = res.staffId ? staff.find(st => st.id === res.staffId) : null;
   const type = res.type || 'treatment';
-  const typeLabels = { treatment: '施術', break: '休憩', task: '業務', shopping: '買い物' };
+  const typeLabels = { treatment: '施術', break: '休憩', task: '業務', practice: '練習', shopping: '買い物' };
   const room = rooms.find(r => r.id === res.roomId);
   const acStaff = res.aftercareStaffId ? staff.find(st => st.id === res.aftercareStaffId) : s;
 
   let html = `<div class="modal-header" style="border-left-color:${s ? s.color : '#9CA3AF'}">
-    <span class="modal-title">${res.name}</span>
+    <span class="modal-title">${type === 'practice' ? '練習' : res.name}</span>
     <button class="modal-close" onclick="closeModal('viewModal')">&times;</button>
   </div><div class="modal-body">`;
 
@@ -1543,7 +1631,12 @@ function openViewModal(res) {
   html += `${res.start} 〜 ${res.end}`;
   if (room) html += ` / ${room.name}`;
   html += `</div>`;
-  html += `<div style="font-size:13px;padding:2px 0">担当: <strong>${s ? s.name : '⚠ 未定'}</strong></div>`;
+  if (type === 'practice' && res.practiceStaffIds && res.practiceStaffIds.length > 0) {
+    const names = res.practiceStaffIds.map(sid => { const ps = staff.find(st => st.id === sid); return ps ? ps.name : '?'; });
+    html += `<div style="font-size:13px;padding:2px 0">参加: <strong>${names.join('、')}</strong></div>`;
+  } else {
+    html += `<div style="font-size:13px;padding:2px 0">担当: <strong>${s ? s.name : '⚠ 未定'}</strong></div>`;
+  }
 
   if (res.aftercareEnd) {
     html += `<div style="font-size:13px;padding:2px 0;color:var(--text-secondary)">アフターケア: 〜${res.aftercareEnd}（${acStaff ? acStaff.name : '—'}）</div>`;
@@ -1597,7 +1690,8 @@ async function quickCheckIn(resId) {
 function openEditModal(res) {
   const bh = getBH(currentDate); if (!bh) return;
   editingRes = res;
-  setType(res.type || 'treatment');
+  const type = res.type || 'treatment';
+  setType(type);
   document.getElementById('modalTitle').textContent = '編集';
   document.getElementById('resName').value = res.name;
   document.getElementById('resMenu').value = res.menu || '';
@@ -1609,6 +1703,23 @@ function openEditModal(res) {
   document.getElementById('resStaff').value = res.staffId || '';
   document.getElementById('resAftercareEnd').value = res.aftercareEnd || '';
   document.getElementById('resAftercareStaff').value = res.aftercareStaffId || '';
+  // 練習の場合、メニューとスタッフを復元
+  if (type === 'practice') {
+    selectedPracticeMenu = '';
+    document.getElementById('practiceMenuCustom').value = '';
+    if (res.menu && PRACTICE_MENUS.includes(res.menu)) {
+      selectedPracticeMenu = res.menu;
+    } else if (res.menu) {
+      document.getElementById('practiceMenuCustom').value = res.menu;
+    }
+    populatePracticeFields();
+    if (res.practiceStaffIds) {
+      res.practiceStaffIds.forEach(sid => {
+        const cb = document.querySelector(`#practiceStaffChecks input[value="${sid}"]`);
+        if (cb) { cb.checked = true; cb.closest('.practice-staff-check').classList.add('checked'); }
+      });
+    }
+  }
   document.getElementById('detailToggle').classList.remove('open');
   document.getElementById('detailSection').classList.remove('open');
   populateSubAssignments(res.subAssignments || []);
@@ -1628,13 +1739,27 @@ function closeModal(id) { document.getElementById(id).classList.remove('active')
 async function saveReservation() {
   const name = document.getElementById('resName').value.trim();
   const isTreatment = currentType === 'treatment' || currentType === 'shopping';
+  const isPractice = currentType === 'practice';
   if (isTreatment && !name) { alert('お客様名を入力してください'); return; }
+  if (isPractice) {
+    const checkedStaff = Array.from(document.querySelectorAll('#practiceStaffChecks input:checked'));
+    if (checkedStaff.length === 0) { alert('参加スタッフを選択してください'); return; }
+  }
+  let menu = '';
+  if (isTreatment) {
+    menu = document.getElementById('resMenu').value.trim();
+  } else if (isPractice) {
+    menu = selectedPracticeMenu || document.getElementById('practiceMenuCustom').value.trim();
+  }
+  const practiceStaffIds = isPractice
+    ? Array.from(document.querySelectorAll('#practiceStaffChecks input:checked')).map(i => i.value)
+    : null;
   const data = {
     id: editingRes ? editingRes.id : 'r' + Date.now(),
     date: dateKey(currentDate),
     name: name || currentType,
-    menu: isTreatment ? document.getElementById('resMenu').value.trim() : '',
-    staffId: document.getElementById('resStaff').value || '',
+    menu: menu,
+    staffId: isPractice ? (practiceStaffIds[0] || '') : (document.getElementById('resStaff').value || ''),
     start: document.getElementById('resStart').value,
     end: document.getElementById('resEnd').value,
     roomId: document.getElementById('resRoom').value,
@@ -1644,6 +1769,7 @@ async function saveReservation() {
     aftercareEnd: document.getElementById('resAftercareEnd').value || null,
     aftercareStaffId: document.getElementById('resAftercareStaff').value || null,
     subAssignments: getSubAssignments(),
+    practiceStaffIds: practiceStaffIds,
   };
 
   if (editingRes) {
@@ -1667,6 +1793,7 @@ async function saveReservation() {
     checked_in: data.checkedIn, aftercare_end: data.aftercareEnd,
     aftercare_staff_id: data.aftercareStaffId,
     sub_assignments: data.subAssignments || null,
+    practice_staff_ids: data.practiceStaffIds || null,
     updated_at: new Date().toISOString()
   });
 }
