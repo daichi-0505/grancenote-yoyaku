@@ -462,38 +462,39 @@ body {
 </div>
 
 <script>
-// ── GAS API設定 ──
-// デプロイ後にここを書き換える
-const API_URL = 'https://script.google.com/macros/s/AKfycbzTSVuhM9C8nn4H9_e2_ZcufQtt8sOGhSl8FSsPRA4x-eyVgOsquNoaC771dzDwD91-gw/exec';
+// ── Supabase API設定 ──
+const SUPABASE_URL = 'https://lheojchyrxjlagxfbgjo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_sV418nh9Akoc0EnxchRU4g_H2FFAa-4';
+const SB_HEADERS = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
 
 // ── デフォルトデータ（API未接続時のフォールバック） ──
 const DEFAULT_STAFF = [
-  { id: 's1', name: '峯 琴音', color: '#E53935', role: '正社員' },
-  { id: 's9', name: '朝倉 万紀子', color: '#1E88E5', role: '正社員' },
-  { id: 's4', name: '峯 敏絵', color: '#43A047', role: 'オーナー' },
-  { id: 's2', name: 'リン ション', color: '#FB8C00', role: 'パート' },
-  { id: 's3', name: '西村 由維', color: '#8E24AA', role: 'パート' },
-  { id: 's5', name: '林 美志', color: '#00897B', role: 'パート' },
+  { id: 's1', name: '峯 琴音', color: '#E53935' },
+  { id: 's9', name: '朝倉 万紀子', color: '#1E88E5' },
+  { id: 's4', name: '峯 敏絵', color: '#43A047' },
+  { id: 's2', name: 'リン ション', color: '#FB8C00' },
+  { id: 's3', name: '西村 由維', color: '#8E24AA' },
+  { id: 's5', name: '林 美志', color: '#00897B' },
 ];
 
-// スタッフ勤務時間（テスト用。今後シフトデータに差し替え）
+// シフトデータ（Supabaseから取得。デフォルトフォールバック用）
+let dayShifts = [];
 function getStaffShift(staffId, date) {
+  // Supabaseからシフトデータがあればそちらを使う
+  const dk = dateKey(date);
+  const shift = dayShifts.find(s => s.staffId === staffId && s.date === dk);
+  if (shift) return { start: parseFloat(shift.start), end: parseFloat(shift.end) };
+  // フォールバック: デフォルトシフト
   const dow = date.getDay();
   const bh = getBH(date);
-  if (!bh) return null; // 定休日
+  if (!bh) return null;
   switch (staffId) {
-    case 's1': // 峯琴音（正社員）フル
-    case 's9': // 朝倉万紀子（正社員）フル
-    case 's4': // 峯敏絵（オーナー）フル
+    case 's1': case 's9': case 's4':
       return { start: bh.start, end: bh.end };
-    case 's2': // リンション（パート）〜17:00
-      return { start: bh.start, end: 17 };
-    case 's3': // 西村由維（パート）〜13:00
-      return { start: bh.start, end: 13 };
-    case 's5': // 林美志（パート）土曜フル
-      return dow === 6 ? { start: bh.start, end: bh.end } : null;
-    default:
-      return { start: bh.start, end: bh.end };
+    case 's2': return { start: bh.start, end: 17 };
+    case 's3': return { start: bh.start, end: 13 };
+    case 's5': return dow === 6 ? { start: bh.start, end: bh.end } : null;
+    default: return { start: bh.start, end: bh.end };
   }
 }
 const DEFAULT_ROOMS = [
@@ -518,47 +519,76 @@ let checks = [];
 let dayReservations = [];
 let dayCheckStates = {};
 let currentDate = new Date(); currentDate.setHours(0,0,0,0);
-let useApi = API_URL && !API_URL.includes('%%');
 let syncing = false;
 
 const DOW = ['日','月','火','水','木','金','土'];
 function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
-// ── API通信 ──
+// ── Supabase API通信 ──
 function showSync(on) {
   syncing = on;
   document.getElementById('syncIndicator').classList.toggle('active', on);
 }
 
-async function apiGet(params) {
-  if (!useApi) return null;
-  const url = API_URL + '?' + new URLSearchParams(params).toString();
-  const res = await fetch(url);
-  return res.json();
+async function sbGet(table, query = '') {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return await res.json();
+  } catch(e) { console.warn('Supabase GET error:', e); return null; }
 }
 
-async function apiWrite(params) {
-  if (!useApi) { console.warn('API未接続: データはlocalStorageに保存'); return null; }
+async function sbPost(table, data) {
   showSync(true);
   try {
-    const url = API_URL + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    const json = await res.json();
-    if (!json.ok) console.error('API書込エラー:', json.error);
-    return json;
-  } catch(e) {
-    console.error('API通信エラー:', e);
-    return null;
-  } finally {
-    showSync(false);
-  }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST', headers: { ...SB_HEADERS, 'Prefer': 'return=representation,resolution=merge-duplicates' }, body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    return await res.json();
+  } catch(e) { console.error('Supabase POST error:', e); return null; }
+  finally { showSync(false); }
 }
 
-// ── LocalStorage（フォールバック用） ──
+async function sbDelete(table, query) {
+  showSync(true);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+      method: 'DELETE', headers: SB_HEADERS
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return true;
+  } catch(e) { console.error('Supabase DELETE error:', e); return false; }
+  finally { showSync(false); }
+}
+
+async function sbUpsert(table, data) {
+  showSync(true);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST', headers: { ...SB_HEADERS, 'Prefer': 'return=minimal,resolution=merge-duplicates' }, body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    return true;
+  } catch(e) { console.error('Supabase UPSERT error:', e); return false; }
+  finally { showSync(false); }
+}
+
+// snake_case <-> camelCase 変換
+function snakeToCamel(obj) {
+  const r = {};
+  for (const k in obj) {
+    const ck = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    r[ck] = obj[k];
+  }
+  return r;
+}
+
+// ── LocalStorage（キャッシュ用） ──
 function lsLoad(key, def) { try { const d = localStorage.getItem('rs_' + key); return d ? JSON.parse(d) : JSON.parse(JSON.stringify(def)); } catch { return JSON.parse(JSON.stringify(def)); } }
 function lsSave(key, data) { localStorage.setItem('rs_' + key, JSON.stringify(data)); }
 
-// ── データ読込（2段階: localStorageで即表示 → APIで最新に更新） ──
+// ── データ読込（2段階: localStorageで即表示 → Supabaseで最新に更新） ──
 function loadConfigFromCache() {
   staff = lsLoad('staff', DEFAULT_STAFF);
   rooms = lsLoad('rooms', DEFAULT_ROOMS);
@@ -570,37 +600,68 @@ function loadDayDataFromCache() {
   const allRes = lsLoad('reservations', {});
   dayReservations = allRes[dk] || [];
   dayCheckStates = (lsLoad('checkstates', {}))[dk] || {};
+  dayShifts = (lsLoad('shifts', {}))[dk] || [];
 }
 
-function syncConfigFromApi() {
-  if (!useApi) return;
-  apiGet({ action: 'getAll' }).then(data => {
-    if (data && data.ok) {
-      staff = data.staff;
-      rooms = data.rooms;
-      checks = data.checks;
+async function syncConfigFromApi() {
+  try {
+    const [staffData, roomData, checkData] = await Promise.all([
+      sbGet('yoyaku_staff', 'order=sort_order'),
+      sbGet('yoyaku_rooms', 'order=sort_order'),
+      sbGet('yoyaku_checks', 'order=sort_order'),
+    ]);
+    if (staffData) {
+      staff = staffData.map(s => ({ id: s.id, name: s.name, color: s.color, sortOrder: s.sort_order }));
       lsSave('staff', staff);
-      lsSave('rooms', rooms);
-      lsSave('checks', checks);
-      renderAll();
     }
-  }).catch(e => console.warn('API config sync error', e));
+    if (roomData) {
+      rooms = roomData.map(r => ({ id: r.id, name: r.name, sub: r.sub || '', divider: r.divider, sortOrder: r.sort_order }));
+      lsSave('rooms', rooms);
+    }
+    if (checkData) {
+      checks = checkData.map(c => ({ id: c.id, label: c.label, sortOrder: c.sort_order }));
+      lsSave('checks', checks);
+    }
+    renderAll();
+  } catch(e) { console.warn('Config sync error', e); }
 }
 
-function syncDayDataFromApi() {
-  if (!useApi) return;
+async function syncDayDataFromApi() {
   const dk = dateKey(currentDate);
-  apiGet({ action: 'getDay', date: dk }).then(data => {
-    if (data && data.ok) {
-      dayReservations = data.reservations;
-      dayCheckStates = data.checkStates;
-      // localStorageにもキャッシュ
+  try {
+    const [resData, stateData, shiftData] = await Promise.all([
+      sbGet('yoyaku_reservations', `date=eq.${dk}`),
+      sbGet('yoyaku_check_states', `date=eq.${dk}`),
+      sbGet('yoyaku_shifts', `date=eq.${dk}`),
+    ]);
+    if (resData) {
+      dayReservations = resData.map(r => ({
+        id: r.id, date: r.date, name: r.name, menu: r.menu || '',
+        staffId: r.staff_id, start: r.start_time, end: r.end_time,
+        roomId: r.room_id, memo: r.memo || '', updatedAt: r.updated_at
+      }));
       const allRes = lsLoad('reservations', {});
       allRes[dk] = dayReservations;
       lsSave('reservations', allRes);
-      renderGrid();
     }
-  }).catch(e => console.warn('API day sync error', e));
+    if (stateData) {
+      dayCheckStates = {};
+      stateData.forEach(s => { dayCheckStates[s.check_id] = s.checked; });
+      const allStates = lsLoad('checkstates', {});
+      allStates[dk] = dayCheckStates;
+      lsSave('checkstates', allStates);
+    }
+    if (shiftData) {
+      dayShifts = shiftData.map(s => ({
+        id: s.id, staffId: s.staff_id, date: s.date,
+        start: s.start_time, end: s.end_time
+      }));
+      const allShifts = lsLoad('shifts', {});
+      allShifts[dk] = dayShifts;
+      lsSave('shifts', allShifts);
+    }
+    renderAll();
+  } catch(e) { console.warn('Day sync error', e); }
 }
 
 // ── 営業時間 ──
@@ -753,14 +814,11 @@ function renderChecklist() {
     cb.checked = !!dayCheckStates[c.id];
     cb.addEventListener('change', () => {
       dayCheckStates[c.id] = cb.checked;
-      if (useApi) {
-        apiWrite({ action: 'saveCheckState', date: dateKey(currentDate), checkId: c.id, checked: String(cb.checked) });
-      } else {
-        const all = lsLoad('checkstates', {});
-        if (!all[dateKey(currentDate)]) all[dateKey(currentDate)] = {};
-        all[dateKey(currentDate)][c.id] = cb.checked;
-        lsSave('checkstates', all);
-      }
+      const all = lsLoad('checkstates', {});
+      if (!all[dateKey(currentDate)]) all[dateKey(currentDate)] = {};
+      all[dateKey(currentDate)][c.id] = cb.checked;
+      lsSave('checkstates', all);
+      sbUpsert('yoyaku_check_states', { date: dateKey(currentDate), check_id: c.id, checked: cb.checked });
     });
     const sp = document.createElement('span'); sp.textContent = c.label;
     lbl.appendChild(cb); lbl.appendChild(sp); bar.appendChild(lbl);
@@ -943,10 +1001,12 @@ async function saveReservation() {
   const allRes = lsLoad('reservations', {});
   allRes[dateKey(currentDate)] = dayReservations;
   lsSave('reservations', allRes);
-  // APIにも保存
-  if (useApi) {
-    apiWrite({ action: 'saveReservation', data: JSON.stringify(data) });
-  }
+  // Supabaseにも保存
+  sbUpsert('yoyaku_reservations', {
+    id: data.id, date: data.date, name: data.name, menu: data.menu,
+    staff_id: data.staffId, start_time: data.start, end_time: data.end,
+    room_id: data.roomId, memo: data.memo, updated_at: new Date().toISOString()
+  });
 }
 
 async function deleteReservation() {
@@ -961,10 +1021,8 @@ async function deleteReservation() {
   const allRes = lsLoad('reservations', {});
   allRes[dateKey(currentDate)] = dayReservations;
   lsSave('reservations', allRes);
-  // APIからも削除
-  if (useApi) {
-    apiWrite({ action: 'deleteReservation', id });
-  }
+  // Supabaseからも削除
+  sbDelete('yoyaku_reservations', `id=eq.${id}`);
 }
 
 // ── Settings ──
@@ -1024,22 +1082,19 @@ function renderChecklistSettings() {
 }
 
 async function saveStaffConfig() {
-  if (useApi) {
-    const list = staff.map((s,i) => ({ ...s, sortOrder: i }));
-    await apiWrite({ action: 'saveStaff', data: JSON.stringify(list) });
-  } else { lsSave('staff', staff); }
+  lsSave('staff', staff);
+  const list = staff.map((s,i) => ({ id: s.id, name: s.name, color: s.color, sort_order: i }));
+  sbUpsert('yoyaku_staff', list);
 }
 async function saveRoomConfig() {
-  if (useApi) {
-    const list = rooms.map((r,i) => ({ ...r, divider: r.divider ? 'true' : '', sortOrder: i }));
-    await apiWrite({ action: 'saveRooms', data: JSON.stringify(list) });
-  } else { lsSave('rooms', rooms); }
+  lsSave('rooms', rooms);
+  const list = rooms.map((r,i) => ({ id: r.id, name: r.name, sub: r.sub || '', divider: !!r.divider, sort_order: i }));
+  sbUpsert('yoyaku_rooms', list);
 }
 async function saveCheckConfig() {
-  if (useApi) {
-    const list = checks.map((c,i) => ({ ...c, sortOrder: i }));
-    await apiWrite({ action: 'saveChecks', data: JSON.stringify(list) });
-  } else { lsSave('checks', checks); }
+  lsSave('checks', checks);
+  const list = checks.map((c,i) => ({ id: c.id, label: c.label, sort_order: i }));
+  sbUpsert('yoyaku_checks', list);
 }
 
 // ── イベント ──
@@ -1086,9 +1141,8 @@ document.getElementById('settingsBtn').addEventListener('click', openSettings);
 document.getElementById('settingsClose').addEventListener('click', () => { closeModal('settingsModal'); renderAll(); });
 document.getElementById('modalClose').addEventListener('click', () => closeModal('reservationModal'));
 document.getElementById('refreshBtn').addEventListener('click', async () => {
-  await loadConfig();
-  await loadDayData();
-  renderAll();
+  await syncConfigFromApi();
+  await syncDayDataFromApi();
 });
 
 ['reservationModal','settingsModal'].forEach(id => {
