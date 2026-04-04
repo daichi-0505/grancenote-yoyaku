@@ -29,23 +29,22 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html { height: 100dvh; overflow: hidden; }
+html { height: 100dvh; width: 100dvw; overflow: hidden; }
 body {
   font-family: -apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;
   background: var(--bg-primary); overflow: hidden;
-  height: 100%; display: flex; flex-direction: column;
+  height: 100%; width: 100%; display: flex; flex-direction: column;
   color: var(--text-primary);
 }
 
-/* スマホ縦持ち時: 強制横表示（画面を90度回転） */
-@media (orientation: portrait) and (max-width: 768px) {
-  html {
-    width: 100dvh; height: 100dvw;
-    transform: rotate(90deg);
-    transform-origin: top left;
-    position: absolute; top: 0; left: 100dvw;
-    overflow: hidden;
-  }
+/* 強制横表示用（JSで適用） */
+html.force-landscape {
+  position: fixed; top: 0; left: 0;
+  width: 100vh !important; height: 100vw !important;
+  transform: rotate(90deg);
+  transform-origin: top left;
+  margin-left: 100vw;
+  overflow: hidden;
 }
 
 /* ── Loading ── */
@@ -920,10 +919,32 @@ document.addEventListener('touchend', e => {
   if (Math.abs(diff) > 80) changeDate(diff > 0 ? -1 : 1);
 }, { passive: true });
 
+// ── 強制横表示 ──
+function forceLandscape() {
+  // Screen Orientation API（PWA/フルスクリーン時に有効）
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
+  } catch(e) {}
+
+  // CSS回転によるフォールバック
+  function checkOrientation() {
+    const isPortrait = window.innerHeight > window.innerWidth;
+    document.documentElement.classList.toggle('force-landscape', isPortrait);
+    // 回転後にグリッドを再描画
+    setTimeout(() => renderGrid(), 100);
+  }
+  checkOrientation();
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 200));
+}
+
 // ── 初期化 ──
 function renderAll() { renderHeader(); renderChecklist(); renderGrid(); }
 
 async function init() {
+  forceLandscape();
   await loadConfig();
   await loadDayData();
   renderAll();
