@@ -356,11 +356,14 @@ body {
   display: flex; flex-direction: column; justify-content: flex-end;
   padding-bottom: 0;
 }
+.reservation.type-practice {
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
 .reservation.type-practice .res-top {
-  position: relative; z-index: 1;
+  margin-bottom: 1px;
 }
 .practice-lines {
-  display: flex; flex-direction: column; gap: 2px; position: absolute; bottom: 2px; left: 0; right: 0;
+  display: flex; flex-direction: column; gap: 2px;
 }
 .practice-line {
   height: 4px; border-radius: 2px;
@@ -1357,6 +1360,15 @@ function renderGrid() {
         }
       }
       html += '</div>';
+      // 練習: ラベルの下にスタッフ色線を並行表示
+      if (type === 'practice' && res.practiceStaffIds && res.practiceStaffIds.length > 0) {
+        html += '<div class="practice-lines">';
+        res.practiceStaffIds.forEach(sid => {
+          const ps = staff.find(st => st.id === sid);
+          if (ps) html += `<div class="practice-line" style="background:${ps.color}"></div>`;
+        });
+        html += '</div>';
+      }
       html += '<div class="res-bottom">';
       if (type === 'break' || type === 'task') {
         const typeLabels = { break: '休憩', task: '業務' };
@@ -1365,14 +1377,6 @@ function renderGrid() {
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
-      // 練習: 参加スタッフの色線を並行表示
-      if (type === 'practice' && res.practiceStaffIds && res.practiceStaffIds.length > 0) {
-        html += '<div class="practice-lines">';
-        res.practiceStaffIds.forEach(sid => {
-          const ps = staff.find(st => st.id === sid);
-          if (ps) html += `<div class="practice-line" style="background:${ps.color}"></div>`;
-        });
-        html += '</div>';
       }
       html += '</div>';
       // アフターケア線（予約枠の外、time-cells上に直接配置）
