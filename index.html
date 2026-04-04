@@ -438,7 +438,7 @@ body {
 }
 
 /* Click overlay */
-.click-overlay { position: absolute; inset: 0; z-index: 2; cursor: pointer; }
+.click-overlay { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
 
 /* ── Modal ── */
 .modal-overlay {
@@ -1278,7 +1278,7 @@ function renderGrid() {
       // 色ブロック（背景のみ）
       html += `<div class="${cls}" style="${style}"></div>`;
       // 文字レイヤー（最上位、タップ可能）
-      html += `<div class="res-text-layer" style="left:${left}%;width:${width}%" data-id="${res.id}">`;
+      html += `<div class="res-text-layer type-${type}${noStaff ? ' no-staff' : ''}" style="left:${left}%;width:${width}%" data-id="${res.id}">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
       html += `<span class="res-time-label">${res.start}〜</span>`;
