@@ -705,10 +705,18 @@ function renderHeader() {
 
 let shiftOpen = false;
 
+// スタッフ並び順: 出勤>休み、正社員>パート>先生(敏絵)
+const STAFF_RANK = { 's1': 1, 's9': 2, 's2': 3, 's3': 4, 's5': 5, 's4': 6 }; // 琴音,朝倉(正社員) → リン,西村,林(パート) → 敏絵(先生)
 function renderStaffStatus() {
   const bar = document.getElementById('staffStatusBar');
   bar.innerHTML = '';
-  staff.forEach(s => {
+  const sorted = [...staff].sort((a, b) => {
+    const aShift = getStaffShift(a.id, currentDate) ? 0 : 1;
+    const bShift = getStaffShift(b.id, currentDate) ? 0 : 1;
+    if (aShift !== bShift) return aShift - bShift;
+    return (STAFF_RANK[a.id] || 99) - (STAFF_RANK[b.id] || 99);
+  });
+  sorted.forEach(s => {
     const shift = getStaffShift(s.id, currentDate);
     const chip = document.createElement('span');
     chip.className = 'staff-chip' + (shift ? '' : ' inactive');
