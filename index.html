@@ -132,6 +132,25 @@ body {
 /* Memo space */
 .memo-space { display: none; }
 
+/* スタッフ出勤状況 */
+.staff-status-bar {
+  background: var(--bg-card); border-bottom: 1px solid var(--border-default);
+  padding: 4px 12px; display: flex; gap: 8px; flex-shrink: 0; align-items: center;
+  flex-wrap: wrap;
+}
+.staff-status-label {
+  font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px;
+  margin-right: 4px; white-space: nowrap;
+}
+.staff-chip {
+  display: flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 12px; font-size: 11px; font-weight: 700;
+  border: 1.5px solid var(--border-default); cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.staff-chip.active { border-color: transparent; color: var(--text-primary); }
+.staff-chip.inactive { opacity: 0.35; }
+
 /* Time header（枠の外） */
 .time-header-row {
   display: flex; flex-shrink: 0; height: 20px;
@@ -334,6 +353,7 @@ body {
   </div>
 </div>
 
+<div class="staff-status-bar" id="staffStatusBar"></div>
 <div class="checklist-bar" id="checklistBar"></div>
 <div class="memo-space"></div>
 <div class="grid-wrapper" id="gridWrapper"></div>
@@ -440,15 +460,12 @@ async function apiGet(params) {
   return res.json();
 }
 
-async function apiPost(body) {
+async function apiWrite(params) {
   if (!useApi) return null;
   showSync(true);
   try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(body),
-    });
+    const url = API_URL + '?' + new URLSearchParams(params).toString();
+    const res = await fetch(url);
     return res.json();
   } finally {
     showSync(false);
@@ -526,6 +543,19 @@ function renderHeader() {
   document.getElementById('datePicker').value = dateKey(d);
 }
 
+function renderStaffStatus() {
+  const bar = document.getElementById('staffStatusBar');
+  bar.innerHTML = '<span class="staff-status-label">出勤</span>';
+  staff.forEach(s => {
+    const chip = document.createElement('span');
+    chip.className = 'staff-chip active';
+    chip.style.background = s.color;
+    chip.textContent = s.name.split(' ')[0];
+    chip.title = s.name;
+    bar.appendChild(chip);
+  });
+}
+
 function renderChecklist() {
   const bar = document.getElementById('checklistBar');
   bar.innerHTML = '';
@@ -536,7 +566,7 @@ function renderChecklist() {
     cb.addEventListener('change', () => {
       dayCheckStates[c.id] = cb.checked;
       if (useApi) {
-        apiPost({ action: 'saveCheckState', date: dateKey(currentDate), checkId: c.id, checked: cb.checked });
+        apiWrite({ action: 'saveCheckState', date: dateKey(currentDate), checkId: c.id, checked: String(cb.checked) });
       } else {
         const all = lsLoad('checkstates', {});
         if (!all[dateKey(currentDate)]) all[dateKey(currentDate)] = {};
@@ -723,7 +753,7 @@ async function saveReservation() {
   renderGrid();
 
   if (useApi) {
-    await apiPost({ action: 'saveReservation', reservation: data });
+    await apiWrite({ action: 'saveReservation', data: JSON.stringify(data) });
   } else {
     const allRes = lsLoad('reservations', {});
     allRes[dateKey(currentDate)] = dayReservations;
@@ -740,7 +770,7 @@ async function deleteReservation() {
   renderGrid();
 
   if (useApi) {
-    await apiPost({ action: 'deleteReservation', id });
+    await apiWrite({ action: 'deleteReservation', id });
   } else {
     const allRes = lsLoad('reservations', {});
     allRes[dateKey(currentDate)] = dayReservations;
@@ -807,19 +837,19 @@ function renderChecklistSettings() {
 async function saveStaffConfig() {
   if (useApi) {
     const list = staff.map((s,i) => ({ ...s, sortOrder: i }));
-    await apiPost({ action: 'saveStaff', staff: list });
+    await apiWrite({ action: 'saveStaff', data: JSON.stringify(list) });
   } else { lsSave('staff', staff); }
 }
 async function saveRoomConfig() {
   if (useApi) {
     const list = rooms.map((r,i) => ({ ...r, divider: r.divider ? 'true' : '', sortOrder: i }));
-    await apiPost({ action: 'saveRooms', rooms: list });
+    await apiWrite({ action: 'saveRooms', data: JSON.stringify(list) });
   } else { lsSave('rooms', rooms); }
 }
 async function saveCheckConfig() {
   if (useApi) {
     const list = checks.map((c,i) => ({ ...c, sortOrder: i }));
-    await apiPost({ action: 'saveChecks', checks: list });
+    await apiWrite({ action: 'saveChecks', data: JSON.stringify(list) });
   } else { lsSave('checks', checks); }
 }
 
@@ -905,7 +935,7 @@ function setupLandscape() {
 }
 
 // ── 初期化 ──
-function renderAll() { renderHeader(); renderChecklist(); renderGrid(); }
+function renderAll() { renderHeader(); renderStaffStatus(); renderChecklist(); renderGrid(); }
 
 async function init() {
   setupLandscape();
