@@ -124,8 +124,9 @@ body {
 .check-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 
 /* ── Grid ── */
-.grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.grid-table { flex: 1; display: flex; flex-direction: column; width: 100%; }
+.grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.grid-table { display: flex; flex-direction: column; width: 100%; }
 
 /* Memo space */
 .memo-space {
@@ -153,7 +154,7 @@ body {
 
 /* Room rows */
 .room-row {
-  display: flex; flex: 1; min-height: 32px;
+  display: flex; height: 60px; flex-shrink: 0;
   border-bottom: 1px solid var(--border-default);
 }
 .room-row.section-divider { border-top: 2.5px solid var(--accent); }
@@ -291,11 +292,14 @@ body {
 .room-sub-input { border: none; font-size: 11px; color: var(--text-muted); width: 50px; outline: none; flex-shrink: 0; font-weight: 600; }
 
 /* ── Responsive ── */
+
+/* PC・タブレット横 */
 @media (min-width: 1024px) {
   .header { padding: 12px 24px; }
   .header-date { font-size: 24px; }
   .header-dow { font-size: 18px; }
   .room-label { font-size: 15px; padding: 4px 10px; }
+  .room-row { height: 70px; }
   .hour-block { font-size: 13px; }
   .reservation { top: 3px; bottom: 3px; padding: 3px 6px; }
   .res-name { font-size: 14px; }
@@ -304,7 +308,8 @@ body {
   .modal { border-radius: 16px; max-width: 420px; }
 }
 
-@media (max-width: 480px) {
+/* スマホ縦: スクロールで見る、各行は十分な高さ */
+@media (max-width: 480px) and (orientation: portrait) {
   .header { padding: 6px 10px; gap: 4px; }
   .header-date { font-size: 16px; }
   .header-dow { font-size: 13px; }
@@ -317,24 +322,33 @@ body {
   .hour-block { font-size: 10px; }
   .checklist-bar { padding: 4px 10px; gap: 12px; }
   .check-item { font-size: 12px; }
-  .memo-space { height: 40px; }
+  .memo-space { height: 30px; }
+  .room-row { height: 56px; }
   .res-name { font-size: 11px; }
   .res-menu-label { font-size: 9px; }
 }
 
+/* スマホ横: ヘッダー・チェックリストを極力コンパクトに、グリッドを広く */
 @media (orientation: landscape) and (max-height: 500px) {
-  .header { padding: 4px 12px; }
-  .header-date { font-size: 15px; }
-  .header-dow { font-size: 12px; }
-  .nav-btn { width: 28px; height: 28px; font-size: 14px; }
-  .today-btn { padding: 4px 8px; font-size: 11px; }
-  .checklist-bar { padding: 3px 10px; }
-  .check-item { font-size: 11px; }
-  .memo-space { height: 30px; }
-  .room-label { font-size: 11px; min-height: 0; }
-  .room-row { min-height: 28px; }
+  .header { padding: 3px 12px; }
+  .header-date { font-size: 14px; }
+  .header-dow { font-size: 11px; }
+  .nav-btn { width: 26px; height: 26px; font-size: 13px; border-radius: 6px; }
+  .today-btn { padding: 3px 8px; font-size: 10px; border-radius: 6px; }
+  .settings-btn { padding: 3px 8px; font-size: 10px; }
+  .refresh-btn { padding: 3px 6px; font-size: 13px; }
+  .checklist-bar { padding: 2px 10px; gap: 10px; }
+  .check-item { font-size: 10px; }
+  .check-item input[type="checkbox"] { width: 14px; height: 14px; }
+  .memo-space { height: 20px; }
+  .room-row { height: 44px; }
+  .room-label { font-size: 10px; padding: 1px 3px; }
+  .room-sublabel { font-size: 8px; }
   .time-header-row { height: 18px; }
   .hour-block { font-size: 9px; }
+  .res-name { font-size: 10px; }
+  .res-menu-label { font-size: 8px; }
+  .res-memo-tag { font-size: 8px; }
 }
 </style>
 </head>
@@ -588,20 +602,19 @@ function renderGrid() {
   const labelW = getLabelW();
   const totalH = bh.end - bh.start;
 
-  let html = '<div class="grid-table">';
-
-  // Time header
-  html += '<div class="time-header-row">';
-  html += `<div class="corner-cell" style="width:${labelW}px"></div>`;
-  html += '<div class="time-header-cells">';
+  // Time header (fixed at top)
+  let headerHtml = '<div class="time-header-row">';
+  headerHtml += `<div class="corner-cell" style="width:${labelW}px"></div>`;
+  headerHtml += '<div class="time-header-cells">';
   for (let h = bh.start; h <= bh.end; h++) {
     const pct = (h - bh.start) / totalH * 100;
-    html += `<div style="position:absolute;left:${pct}%;top:0;bottom:0;border-left:1px solid ${h === bh.start || h === bh.end ? 'var(--accent)' : 'rgba(44,62,107,0.15)'};pointer-events:none"></div>`;
-    html += `<div class="hour-block" style="left:${pct}%">${h}:00</div>`;
+    headerHtml += `<div style="position:absolute;left:${pct}%;top:0;bottom:0;border-left:1px solid ${h === bh.start || h === bh.end ? 'var(--accent)' : 'rgba(44,62,107,0.15)'};pointer-events:none"></div>`;
+    headerHtml += `<div class="hour-block" style="left:${pct}%">${h}:00</div>`;
   }
-  html += '</div></div>';
+  headerHtml += '</div></div>';
 
-  // Room rows
+  // Scrollable room rows
+  let html = '<div class="grid-table">';
   rooms.forEach(room => {
     const dc = room.divider ? ' section-divider' : '';
     html += `<div class="room-row${dc}">`;
@@ -652,7 +665,7 @@ function renderGrid() {
   });
 
   html += '</div>';
-  wrapper.innerHTML = html;
+  wrapper.innerHTML = headerHtml + '<div class="grid-scroll">' + html + '</div>';
 
   // Events
   wrapper.querySelectorAll('.click-overlay').forEach(ov => {
