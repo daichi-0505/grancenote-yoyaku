@@ -1310,7 +1310,7 @@ function renderGrid() {
             const [seh, sem] = String(sa.end).split(':').map(Number);
             const saLeft = ((ssh - bh.start) * 60 + ssm) / tMin * 100;
             const saWidth = Math.max(((seh - bh.start) * 60 + sem - (ssh - bh.start) * 60 - ssm) / tMin * 100, 1);
-            html += `<div class="reservation type-treatment sub-block" style="left:${saLeft}%;width:${saWidth}%;--res-color:${saStaff.color};background:${saStaff.color}" data-id="${res.id}"></div>`;
+            html += `<div class="sub-block" style="position:absolute;top:2px;bottom:2px;left:${saLeft}%;width:${saWidth}%;background:${saStaff.color}"></div>`;
           });
         }
       } catch(e) {}
