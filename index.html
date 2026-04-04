@@ -438,7 +438,7 @@ body {
 }
 
 /* Click overlay */
-.click-overlay { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
+.time-cells { cursor: pointer; }
 
 /* ── Modal ── */
 .modal-overlay {
@@ -1238,8 +1238,6 @@ function renderGrid() {
       html += `<div class="${cls}" style="left:${pct}%"></div>`;
     }
 
-    html += `<div class="click-overlay" data-room="${room.id}"></div>`;
-
     const rr = dayReservations.filter(r => r.roomId === room.id);
     // 重なり検出
     const overlaps = detectOverlaps(rr, bh);
@@ -1338,22 +1336,24 @@ function renderGrid() {
   html += '</div>';
   wrapper.innerHTML = '<div class="grid-scroll">' + html + '</div>';
 
-  // Events
-  wrapper.querySelectorAll('.click-overlay').forEach(ov => {
-    ov.addEventListener('click', e => {
-      const rect = ov.getBoundingClientRect();
+  // Events: time-cells handles both reservation taps and blank area taps
+  wrapper.querySelectorAll('.time-cells').forEach(tc => {
+    tc.addEventListener('click', e => {
+      // 予約テキストレイヤーをタップした場合
+      const textLayer = e.target.closest('.res-text-layer');
+      if (textLayer) {
+        e.stopPropagation();
+        const res = dayReservations.find(r => r.id === textLayer.dataset.id);
+        if (res) openViewModal(res);
+        return;
+      }
+      // 空白エリアをタップ → 新規予約追加
+      const rect = tc.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
       const clickMin = Math.round(pct * totalH * 60 / 15) * 15;
       const h = bh.start + Math.floor(clickMin / 60);
       const m = clickMin % 60;
-      openAddModal(ov.dataset.room, h, m, bh);
-    });
-  });
-  wrapper.querySelectorAll('.res-text-layer').forEach(el => {
-    el.addEventListener('click', e => {
-      e.stopPropagation();
-      const res = dayReservations.find(r => r.id === el.dataset.id);
-      if (res) openViewModal(res);
+      openAddModal(tc.dataset.room, h, m, bh);
     });
   });
 }
