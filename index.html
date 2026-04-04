@@ -478,13 +478,20 @@ const DEFAULT_STAFF = [
 ];
 
 // シフトデータ（Supabaseから取得。デフォルトフォールバック用）
+// allShiftsCache: 週間表示用に複数日のシフトをキャッシュ
 let dayShifts = [];
+let allShiftsCache = {};
 function getStaffShift(staffId, date) {
-  // Supabaseからシフトデータがあればそちらを使う
   const dk = dateKey(date);
-  const shift = dayShifts.find(s => s.staffId === staffId && s.date === dk);
-  if (shift) return { start: parseFloat(shift.start), end: parseFloat(shift.end) };
-  // フォールバック: デフォルトシフト
+  // まず現在の日のdayShiftsを確認、次にキャッシュ
+  const shifts = dk === dateKey(currentDate) ? dayShifts : (allShiftsCache[dk] || []);
+  const shift = shifts.find(s => s.staffId === staffId && s.date === dk);
+  if (shift) {
+    // is_off=trueなら明示的に休み
+    if (shift.isOff) return null;
+    return { start: parseFloat(shift.start), end: parseFloat(shift.end) };
+  }
+  // フォールバック: デフォルトシフト（Supabaseにデータがない場合）
   const dow = date.getDay();
   const bh = getBH(date);
   if (!bh) return null;
@@ -654,7 +661,7 @@ async function syncDayDataFromApi() {
     if (shiftData) {
       dayShifts = shiftData.map(s => ({
         id: s.id, staffId: s.staff_id, date: s.date,
-        start: s.start_time, end: s.end_time
+        start: s.start_time, end: s.end_time, isOff: s.is_off
       }));
       const allShifts = lsLoad('shifts', {});
       allShifts[dk] = dayShifts;
@@ -817,7 +824,7 @@ async function saveShift(staffId, date) {
   const shiftId = existing ? existing.id : 'sh' + Date.now();
 
   // localStorageに即反映
-  const shiftObj = { id: shiftId, staffId, date, start: startTime.split(':')[0], end: endTime.split(':')[0] };
+  const shiftObj = { id: shiftId, staffId, date, start: startTime.split(':')[0], end: endTime.split(':')[0], isOff: false };
   dayShifts = dayShifts.filter(s => !(s.staffId === staffId && s.date === date));
   dayShifts.push(shiftObj);
   const allShifts = lsLoad('shifts', {});
@@ -826,7 +833,8 @@ async function saveShift(staffId, date) {
 
   // Supabaseに保存
   await sbUpsert('yoyaku_shifts', {
-    id: shiftId, staff_id: staffId, date, start_time: startTime, end_time: endTime, updated_at: new Date().toISOString()
+    id: shiftId, staff_id: staffId, date, start_time: startTime, end_time: endTime,
+    is_off: false, updated_at: new Date().toISOString()
   });
 
   closeModal('staffModal');
@@ -835,18 +843,23 @@ async function saveShift(staffId, date) {
 
 async function deleteShift(staffId, date) {
   const s = staff.find(x => x.id === staffId);
-  if (!confirm(`${s.name} のシフトを削除して休みにしますか？`)) return;
+  if (!confirm(`${s.name} を ${date} 休みにしますか？`)) return;
 
-  // 既存シフトを探す
+  // is_off=trueのレコードをupsert（デフォルトシフトを上書きするため）
   const existing = dayShifts.find(sh => sh.staffId === staffId && sh.date === date);
+  const shiftId = existing ? existing.id : 'sh' + Date.now();
+  const offObj = { id: shiftId, staffId, date, start: '0', end: '0', isOff: true };
+
   dayShifts = dayShifts.filter(sh => !(sh.staffId === staffId && sh.date === date));
+  dayShifts.push(offObj);
   const allShifts = lsLoad('shifts', {});
   allShifts[date] = dayShifts;
   lsSave('shifts', allShifts);
 
-  if (existing) {
-    await sbDelete('yoyaku_shifts', `id=eq.${existing.id}`);
-  }
+  await sbUpsert('yoyaku_shifts', {
+    id: shiftId, staff_id: staffId, date, start_time: '0:00', end_time: '0:00',
+    is_off: true, updated_at: new Date().toISOString()
+  });
 
   closeModal('staffModal');
   renderAll();
