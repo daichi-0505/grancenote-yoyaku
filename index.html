@@ -926,13 +926,25 @@ function forceLandscape() {
     }
   } catch(e) {}
 
-  // 初回のみ: 縦で開いたらCSS回転を適用し、以降は固定
-  const isPortrait = window.innerHeight > window.innerWidth;
-  if (isPortrait) {
-    document.documentElement.classList.add('force-landscape');
-    setTimeout(() => renderGrid(), 100);
+  // 縦→CSS回転で横表示、横→自然な横表示（二重回転を防ぐ）
+  function applyRotation() {
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const wasForced = document.documentElement.classList.contains('force-landscape');
+    if (isPortrait && !wasForced) {
+      document.documentElement.classList.add('force-landscape');
+      setTimeout(() => renderGrid(), 100);
+    } else if (!isPortrait && wasForced) {
+      document.documentElement.classList.remove('force-landscape');
+      setTimeout(() => renderGrid(), 100);
+    }
   }
-  // 以降の回転イベントは無視（横のまま固定）
+  applyRotation();
+  // debounce付きで回転を監視（チラつき防止）
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(applyRotation, 300);
+  });
 }
 
 // ── 初期化 ──
