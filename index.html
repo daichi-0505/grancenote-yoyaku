@@ -1269,7 +1269,7 @@ function renderGrid() {
       }
 
       // 予約枠（背景+文字、タップ可能）
-      html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
+      html += `<div class="${cls}" style="${style}" data-id="${res.id}" onclick="event.stopPropagation();openViewModal(dayReservations.find(r=>r.id==='${res.id}'))">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
       html += `<span class="res-time-label">${res.start}〜</span>`;
@@ -1329,25 +1329,17 @@ function renderGrid() {
   html += '</div>';
   wrapper.innerHTML = '<div class="grid-scroll">' + html + '</div>';
 
-  // Events
-  wrapper.querySelectorAll('.reservation[data-id]').forEach(el => {
-    el.addEventListener('click', e => {
-      e.stopPropagation();
-      const res = dayReservations.find(r => r.id === el.dataset.id);
-      if (res) openViewModal(res);
-    });
-  });
+  // Events: 空白タップで新規追加
   wrapper.querySelectorAll('.time-cells').forEach(tc => {
-    tc.addEventListener('click', e => {
-      // 予約枠をタップした場合はスキップ（上のハンドラで処理済み）
-      if (e.target.closest('.reservation[data-id]')) return;
+    tc.onclick = function(e) {
+      if (e.target.closest('[data-id]')) return;
       const rect = tc.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
       const clickMin = Math.round(pct * totalH * 60 / 15) * 15;
       const h = bh.start + Math.floor(clickMin / 60);
       const m = clickMin % 60;
       openAddModal(tc.dataset.room, h, m, bh);
-    });
+    };
   });
 }
 
