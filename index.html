@@ -328,27 +328,32 @@ body {
   .res-menu-label { font-size: 9px; }
 }
 
-/* スマホ横: ヘッダー・チェックリストを極力コンパクトに、グリッドを広く */
+/* スマホ横: 全部屋を1画面に収める。スクロール不要 */
 @media (orientation: landscape) and (max-height: 500px) {
-  .header { padding: 3px 12px; }
-  .header-date { font-size: 14px; }
+  .header { padding: 2px 10px; border-bottom-width: 1px; box-shadow: none; }
+  .header-date { font-size: 13px; letter-spacing: 0; }
   .header-dow { font-size: 11px; }
-  .nav-btn { width: 26px; height: 26px; font-size: 13px; border-radius: 6px; }
-  .today-btn { padding: 3px 8px; font-size: 10px; border-radius: 6px; }
-  .settings-btn { padding: 3px 8px; font-size: 10px; }
-  .refresh-btn { padding: 3px 6px; font-size: 13px; }
-  .checklist-bar { padding: 2px 10px; gap: 10px; }
-  .check-item { font-size: 10px; }
-  .check-item input[type="checkbox"] { width: 14px; height: 14px; }
-  .memo-space { height: 20px; }
-  .room-row { height: 44px; }
-  .room-label { font-size: 10px; padding: 1px 3px; }
-  .room-sublabel { font-size: 8px; }
-  .time-header-row { height: 18px; }
-  .hour-block { font-size: 9px; }
-  .res-name { font-size: 10px; }
-  .res-menu-label { font-size: 8px; }
-  .res-memo-tag { font-size: 8px; }
+  .nav-btn { width: 24px; height: 24px; font-size: 12px; border-radius: 5px; }
+  .today-btn { padding: 2px 6px; font-size: 9px; border-radius: 5px; }
+  .settings-btn { padding: 2px 6px; font-size: 9px; }
+  .refresh-btn { padding: 2px 5px; font-size: 12px; }
+  .header-left { gap: 4px; }
+  .header-right { gap: 3px; }
+  .checklist-bar { display: none; }
+  .memo-space { display: none; }
+  .grid-wrapper { flex: 1; }
+  .grid-scroll { overflow-y: hidden; }
+  .room-row { height: auto; flex: 1; min-height: 0; }
+  .grid-table { height: 100%; }
+  .room-label { font-size: 9px; padding: 1px 2px; }
+  .room-sublabel { font-size: 7px; }
+  .time-header-row { height: 16px; }
+  .hour-block { font-size: 8px; padding-bottom: 1px; }
+  .reservation { top: 1px; bottom: 1px; padding: 1px 3px; }
+  .res-name { font-size: 9px; }
+  .res-menu-label { font-size: 7px; padding: 0 3px; }
+  .res-memo-tag { font-size: 7px; }
+  .res-top { gap: 2px; }
 }
 </style>
 </head>
