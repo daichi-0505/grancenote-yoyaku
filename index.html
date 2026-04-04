@@ -1641,7 +1641,7 @@ async function saveReservation() {
     room_id: data.roomId, memo: data.memo, type: data.type,
     checked_in: data.checkedIn, aftercare_end: data.aftercareEnd,
     aftercare_staff_id: data.aftercareStaffId,
-    sub_assignments: data.subAssignments ? JSON.stringify(data.subAssignments) : null,
+    sub_assignments: data.subAssignments || null,
     updated_at: new Date().toISOString()
   });
 }
