@@ -107,6 +107,8 @@ body {
   cursor: pointer; letter-spacing: 1px; transition: all .15s; flex-shrink: 0;
 }
 .today-btn:active { background: var(--accent); color: #fff; }
+.date-select-btn { display: none; }
+@media (min-width: 768px) { .date-select-btn { display: inline-flex; } }
 .header-tabs { display: flex; gap: 4px; flex: 1; justify-content: center; }
 .header-tab {
   padding: 5px 12px; border: 1.5px solid var(--border-default); border-radius: 8px;
@@ -474,6 +476,8 @@ body {
     </div>
     <button class="nav-btn" id="nextDay">&#8250;</button>
     <button class="today-btn" id="todayBtn">今日にもどる</button>
+    <button class="today-btn date-select-btn" id="dateSelectBtn">日付選択</button>
+    <input type="date" id="dateSelectPicker" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none">
   </div>
   <div class="header-tabs">
     <button class="header-tab active" data-page="schedule">予約表</button>
@@ -1369,6 +1373,17 @@ document.getElementById('todayBtn').addEventListener('click', () => {
   goToDate(new Date());
 });
 document.getElementById('datePicker').addEventListener('change', e => {
+  if (e.target.value) {
+    const [y,m,d] = e.target.value.split('-').map(Number);
+    goToDate(new Date(y, m-1, d));
+  }
+});
+document.getElementById('dateSelectBtn').addEventListener('click', () => {
+  const picker = document.getElementById('dateSelectPicker');
+  picker.value = dateKey(currentDate);
+  picker.showPicker();
+});
+document.getElementById('dateSelectPicker').addEventListener('change', e => {
   if (e.target.value) {
     const [y,m,d] = e.target.value.split('-').map(Number);
     goToDate(new Date(y, m-1, d));
