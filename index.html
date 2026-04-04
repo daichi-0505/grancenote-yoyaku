@@ -1875,15 +1875,28 @@ function openSearchModal() {
   });
 
   // 施術時間ボタン
+  const presets = [60,90,120,150,180];
+  const isCustom = !presets.includes(searchSelectedDuration);
   const durEl = document.getElementById('searchDurationBtns');
-  durEl.innerHTML = [90,120,150,180].map(d =>
+  let durHtml = presets.map(d =>
     `<button class="search-filter-btn${searchSelectedDuration === d ? ' active' : ''}" data-dur="${d}">${d}分</button>`
   ).join('');
-  durEl.querySelectorAll('.search-filter-btn').forEach(btn => {
+  durHtml += `<div style="display:flex;align-items:center;gap:4px;margin-top:4px;width:100%">
+    <input type="number" id="searchDurationCustom" min="15" max="480" step="15" value="${isCustom ? searchSelectedDuration : ''}" placeholder="任意（分）" style="width:100px;padding:6px;border:2px solid ${isCustom ? 'var(--accent)' : 'var(--border-default)'};border-radius:8px;font-size:13px;font-weight:700">
+    <button class="search-filter-btn${isCustom ? ' active' : ''}" id="searchDurationCustomBtn">設定</button>
+  </div>`;
+  durEl.innerHTML = durHtml;
+  durEl.querySelectorAll('.search-filter-btn[data-dur]').forEach(btn => {
     btn.addEventListener('click', () => {
       searchSelectedDuration = parseInt(btn.dataset.dur);
+      document.getElementById('searchDurationCustom').value = '';
       openSearchModal();
     });
+  });
+  document.getElementById('searchDurationCustomBtn').addEventListener('click', () => {
+    const v = parseInt(document.getElementById('searchDurationCustom').value);
+    if (v && v >= 15) { searchSelectedDuration = v; openSearchModal(); }
+    else alert('15分以上で入力してください');
   });
 
   document.getElementById('searchModal').classList.add('active');
