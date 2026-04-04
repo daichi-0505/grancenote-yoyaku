@@ -356,14 +356,14 @@ body {
   display: flex; flex-direction: column; justify-content: flex-end;
   padding-bottom: 0;
 }
+.reservation.type-practice .res-top {
+  position: relative; z-index: 1;
+}
 .practice-lines {
-  display: flex; flex-direction: column; gap: 2px; position: absolute; top: 2px; left: 0; right: 0;
+  display: flex; flex-direction: column; gap: 2px; position: absolute; bottom: 2px; left: 0; right: 0;
 }
 .practice-line {
   height: 4px; border-radius: 2px;
-}
-.reservation.type-practice .res-bottom {
-  position: absolute; bottom: 1px; left: 2px;
 }
 .reservation.type-shopping {
   border: 2px solid var(--res-color, #888);
@@ -1343,12 +1343,17 @@ function renderGrid() {
       }
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
-      html += `<span class="res-time-label">${res.start}〜</span>`;
-      if (type !== 'break' && type !== 'task' && type !== 'practice') {
-        if (noStaff) {
-          html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
-        } else {
-          html += `<span class="res-name">${res.name}</span>`;
+      if (type === 'practice') {
+        html += `<span class="res-type-tag">練習</span>`;
+        if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
+      } else {
+        html += `<span class="res-time-label">${res.start}〜</span>`;
+        if (type !== 'break' && type !== 'task') {
+          if (noStaff) {
+            html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
+          } else {
+            html += `<span class="res-name">${res.name}</span>`;
+          }
         }
       }
       html += '</div>';
@@ -1356,9 +1361,6 @@ function renderGrid() {
       if (type === 'break' || type === 'task') {
         const typeLabels = { break: '休憩', task: '業務' };
         html += `<span class="res-type-tag">${typeLabels[type]}</span>`;
-      } else if (type === 'practice') {
-        html += `<span class="res-type-tag">練習</span>`;
-        if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       }
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
