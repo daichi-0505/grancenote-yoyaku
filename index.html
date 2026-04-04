@@ -1301,10 +1301,12 @@ function renderGrid() {
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
       html += `<span class="res-time-label">${res.start}〜</span>`;
-      if (noStaff) {
-        html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
-      } else {
-        html += `<span class="res-name">${res.name}</span>`;
+      if (type !== 'break' && type !== 'task') {
+        if (noStaff) {
+          html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
+        } else {
+          html += `<span class="res-name">${res.name}</span>`;
+        }
       }
       html += '</div>';
       html += '<div class="res-bottom">';
