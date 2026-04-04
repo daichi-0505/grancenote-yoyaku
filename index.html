@@ -37,14 +37,17 @@ body {
   color: var(--text-primary);
 }
 
-/* 強制横表示用（JSで適用） */
-html.force-landscape {
-  position: fixed; top: 0; left: 0;
-  width: 100vh !important; height: 100vw !important;
-  transform: rotate(90deg);
-  transform-origin: top left;
-  margin-left: 100vw;
-  overflow: hidden;
+/* 強制横表示: 縦持ち時にCSS即時回転（JS遅延なし） */
+@media (orientation: portrait) {
+  html {
+    position: fixed; top: 0; left: 0;
+    width: var(--landscape-w, 100vh) !important;
+    height: var(--landscape-h, 100vw) !important;
+    transform: rotate(90deg);
+    transform-origin: top left;
+    margin-left: var(--landscape-h, 100vw);
+    overflow: hidden;
+  }
 }
 
 /* ── Loading ── */
@@ -919,32 +922,21 @@ document.addEventListener('touchend', e => {
 
 // ── 強制横表示 ──
 function forceLandscape() {
-  // Screen Orientation API（PWA/フルスクリーン時に有効）
+  // Screen Orientation API（PWA時に有効）
   try {
     if (screen.orientation && screen.orientation.lock) {
       screen.orientation.lock('landscape').catch(() => {});
     }
   } catch(e) {}
 
-  // 縦→CSS回転で横表示、横→自然な横表示（二重回転を防ぐ）
-  function applyRotation() {
-    const isPortrait = window.innerHeight > window.innerWidth;
-    const wasForced = document.documentElement.classList.contains('force-landscape');
-    if (isPortrait && !wasForced) {
-      document.documentElement.classList.add('force-landscape');
-      setTimeout(() => renderGrid(), 100);
-    } else if (!isPortrait && wasForced) {
-      document.documentElement.classList.remove('force-landscape');
-      setTimeout(() => renderGrid(), 100);
-    }
-  }
-  applyRotation();
-  // debounce付きで回転を監視（チラつき防止）
-  let resizeTimer;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(applyRotation, 300);
-  });
+  // CSS変数に固定px値をセット（1回だけ。vh/vwは回転で値が変わるため）
+  const landscapeW = Math.max(screen.width, screen.height);
+  const landscapeH = Math.min(screen.width, screen.height);
+  document.documentElement.style.setProperty('--landscape-w', landscapeW + 'px');
+  document.documentElement.style.setProperty('--landscape-h', landscapeH + 'px');
+  // 回転後にグリッド再描画
+  const mql = window.matchMedia('(orientation: portrait)');
+  mql.addEventListener('change', () => setTimeout(() => renderGrid(), 50));
 }
 
 // ── 初期化 ──
