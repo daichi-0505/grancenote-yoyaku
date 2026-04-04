@@ -159,7 +159,6 @@ body {
 .staff-status-label {
   font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px;
   white-space: nowrap; display: flex; align-items: center; gap: 4px;
-  margin-left: auto;
 }
 .staff-toggle-icon {
   font-size: 8px; transition: transform 0.2s;
@@ -625,10 +624,6 @@ let shiftOpen = false;
 function renderStaffStatus() {
   const bar = document.getElementById('staffStatusBar');
   bar.innerHTML = '';
-  const label = document.createElement('span');
-  label.className = 'staff-status-label';
-  label.innerHTML = `出勤を表示 <span class="staff-toggle-icon">▼</span>`;
-  bar.appendChild(label);
   staff.forEach(s => {
     const shift = getStaffShift(s.id, currentDate);
     const chip = document.createElement('span');
@@ -638,6 +633,10 @@ function renderStaffStatus() {
     chip.title = s.name + (shift ? ` (${shift.start}:00-${shift.end}:00)` : ' (休み)');
     bar.appendChild(chip);
   });
+  const label = document.createElement('span');
+  label.className = 'staff-status-label';
+  label.innerHTML = `出勤を表示 <span class="staff-toggle-icon">▼</span>`;
+  bar.appendChild(label);
   bar.onclick = toggleShift;
   if (shiftOpen) bar.classList.add('open');
   else bar.classList.remove('open');
