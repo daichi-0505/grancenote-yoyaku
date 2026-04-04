@@ -1027,6 +1027,8 @@ let shiftOpen = false;
 
 // スタッフ並び順: 出勤>休み、正社員>パート>先生(敏絵)
 const STAFF_RANK = { 's1': 1, 's9': 2, 's2': 3, 's3': 4, 's5': 5, 's4': 6 }; // 琴音,朝倉(正社員) → リン,西村,林(パート) → 敏絵(先生)
+const STAFF_SHORT = { 's4': '先生' };
+function shortName(s) { return STAFF_SHORT[s.id] || s.name.replace(' ', ''); }
 function renderStaffStatus() {
   const bar = document.getElementById('staffStatusBar');
   bar.innerHTML = '';
@@ -1041,7 +1043,7 @@ function renderStaffStatus() {
     const chip = document.createElement('span');
     chip.className = 'staff-chip' + (shift ? '' : ' inactive');
     chip.style.background = s.color;
-    chip.textContent = s.name.split(' ')[0];
+    chip.textContent = shortName(s);
     chip.addEventListener('click', e => { e.stopPropagation(); openStaffModal(s); });
     bar.appendChild(chip);
   });
@@ -1247,7 +1249,7 @@ function renderShiftBars() {
     html += `<div class="shift-bar-cells">`;
     const left = (shift.start - bh.start) / totalH * 100;
     const width = (shift.end - shift.start) / totalH * 100;
-    html += `<div class="shift-line" style="left:${left}%;width:${width}%;background:${s.color};cursor:pointer" onclick="openStaffModal(staff.find(x=>x.id==='${s.id}'))">${s.name.split(' ')[0]} ${shift.start}:00-${shift.end}:00</div>`;
+    html += `<div class="shift-line" style="left:${left}%;width:${width}%;background:${s.color};cursor:pointer" onclick="openStaffModal(staff.find(x=>x.id==='${s.id}'))">${shortName(s)} ${shift.start}:00-${shift.end}:00</div>`;
     html += `</div></div>`;
   });
   area.innerHTML = html;
@@ -1566,7 +1568,7 @@ function populatePracticeFields() {
     return `<label class="practice-staff-check${checked ? ' checked' : ''}">
       <input type="checkbox" value="${s.id}" ${checked}>
       <span class="staff-color-dot" style="background:${s.color};width:12px;height:12px;border-radius:50%;display:inline-block"></span>
-      ${s.name.split(' ')[0]}
+      ${shortName(s)}
     </label>`;
   }).join('');
   checksEl.querySelectorAll('input').forEach(inp => {
@@ -1785,7 +1787,7 @@ function openSearchModal() {
   const staffEl = document.getElementById('searchStaffBtns');
   staffEl.innerHTML = staff.map(s => {
     const sel = searchSelectedStaffs.includes(s.id);
-    return `<button class="search-filter-btn" data-id="${s.id}" style="border-color:${sel ? s.color : ''};color:${sel ? s.color : ''};background:${sel ? s.color + '15' : ''}">${s.name.split(' ')[0]}</button>`;
+    return `<button class="search-filter-btn" data-id="${s.id}" style="border-color:${sel ? s.color : ''};color:${sel ? s.color : ''};background:${sel ? s.color + '15' : ''}">${shortName(s)}</button>`;
   }).join('');
   staffEl.querySelectorAll('.search-filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1927,7 +1929,7 @@ async function executeSearch() {
             if (i < slots.length) { rangeStart = slots[i]; prev = slots[i]; }
           }
         }
-        dayStaffSlots.push({ name: s.name.split(' ')[0], color: s.color, slots: displaySlots });
+        dayStaffSlots.push({ name: shortName(s), color: s.color, slots: displaySlots });
       }
     }
 
@@ -2484,7 +2486,7 @@ function renderCalCell(date, monthShifts, isOther) {
     showStaff.forEach(s => {
       const shift = getStaffShiftForCal(s.id, date, monthShifts);
       if (shift) {
-        html += `<div class="cal-name" style="background:${s.color}">${s.name.split(' ')[0]}</div>`;
+        html += `<div class="cal-name" style="background:${s.color}">${shortName(s)}</div>`;
       }
     });
     html += `</div>`;
