@@ -732,7 +732,14 @@ body {
       <button class="modal-close" onclick="closeModal('searchModal')">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="form-group"><label>スタッフ</label>
+      <div class="form-group"><label>検索期間</label>
+        <div class="form-row">
+          <input type="date" id="searchDateFrom" style="flex:1;padding:6px;border:1px solid var(--border-default);border-radius:8px;font-size:13px">
+          <span style="padding:0 4px;color:var(--text-muted)">〜</span>
+          <input type="date" id="searchDateTo" style="flex:1;padding:6px;border:1px solid var(--border-default);border-radius:8px;font-size:13px">
+        </div>
+      </div>
+      <div class="form-group"><label>スタッフ（複数選択可）</label>
         <div class="search-filter-row" id="searchStaffBtns"></div>
       </div>
       <div class="form-group"><label>希望曜日</label>
@@ -1760,19 +1767,31 @@ async function quickCheckIn(resId) {
 }
 
 // ── 空き枠検索 ──
-let searchSelectedStaff = '';
+let searchSelectedStaffs = [];
 let searchSelectedDows = [];
 let searchSelectedDuration = 90;
 
 function openSearchModal() {
-  // スタッフボタン
+  // 期間デフォルト設定
+  const fromEl = document.getElementById('searchDateFrom');
+  const toEl = document.getElementById('searchDateTo');
+  if (!fromEl.value) {
+    fromEl.value = dateKey(new Date());
+    const def = new Date(); def.setDate(def.getDate() + 60);
+    toEl.value = dateKey(def);
+  }
+
+  // スタッフボタン（複数選択）
   const staffEl = document.getElementById('searchStaffBtns');
-  staffEl.innerHTML = staff.map(s =>
-    `<button class="search-filter-btn" data-id="${s.id}" style="border-color:${searchSelectedStaff === s.id ? s.color : ''};color:${searchSelectedStaff === s.id ? s.color : ''};background:${searchSelectedStaff === s.id ? s.color + '15' : ''}">${s.name.split(' ')[0]}</button>`
-  ).join('');
+  staffEl.innerHTML = staff.map(s => {
+    const sel = searchSelectedStaffs.includes(s.id);
+    return `<button class="search-filter-btn" data-id="${s.id}" style="border-color:${sel ? s.color : ''};color:${sel ? s.color : ''};background:${sel ? s.color + '15' : ''}">${s.name.split(' ')[0]}</button>`;
+  }).join('');
   staffEl.querySelectorAll('.search-filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      searchSelectedStaff = btn.dataset.id;
+      const id = btn.dataset.id;
+      if (searchSelectedStaffs.includes(id)) searchSelectedStaffs = searchSelectedStaffs.filter(x => x !== id);
+      else searchSelectedStaffs.push(id);
       openSearchModal();
     });
   });
@@ -1808,31 +1827,32 @@ function openSearchModal() {
 }
 
 async function executeSearch() {
-  if (!searchSelectedStaff) { alert('スタッフを選択してください'); return; }
+  if (searchSelectedStaffs.length === 0) { alert('スタッフを選択してください'); return; }
   if (searchSelectedDows.length === 0) { alert('希望曜日を選択してください'); return; }
 
   const resultsEl = document.getElementById('searchResults');
   resultsEl.innerHTML = '<div class="search-loading">検索中...</div>';
 
   const duration = searchSelectedDuration;
-  const today = new Date();
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + 60); // 2ヶ月先まで検索
+  const startStr = document.getElementById('searchDateFrom').value;
+  const endStr = document.getElementById('searchDateTo').value;
+  if (!startStr || !endStr) { alert('検索期間を指定してください'); return; }
 
-  const startStr = dateKey(today);
-  const endStr = dateKey(endDate);
+  const startDate = new Date(startStr + 'T00:00:00');
+  const endDate = new Date(endStr + 'T00:00:00');
 
-  // Supabaseから対象期間の予約とシフトを取得
+  // Supabaseから対象期間の予約とシフトを各スタッフ分取得
+  const staffFilter = searchSelectedStaffs.map(id => `staff_id.eq.${id}`).join(',');
   const [resData, shiftData] = await Promise.all([
-    sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&staff_id=eq.${searchSelectedStaff}&select=date,start_time,end_time,type`),
-    sbGet('yoyaku_shifts', `date=gte.${startStr}&date=lte.${endStr}&staff_id=eq.${searchSelectedStaff}`),
+    sbGet('yoyaku_reservations', `date=gte.${startStr}&date=lte.${endStr}&or=(${staffFilter})&select=date,start_time,end_time,type,staff_id`),
+    sbGet('yoyaku_shifts', `date=gte.${startStr}&date=lte.${endStr}&or=(${staffFilter})`),
   ]);
 
   const reservations = resData || [];
   const shifts = shiftData || [];
 
   const results = [];
-  const d = new Date(today);
+  const d = new Date(startDate);
 
   while (d <= endDate) {
     const dow = d.getDay();
@@ -1841,72 +1861,81 @@ async function executeSearch() {
     const bh = getBH(d);
     if (!bh) { d.setDate(d.getDate() + 1); continue; }
 
-    // スタッフのシフト確認
     const dk = dateKey(d);
-    const shiftRec = shifts.find(s => s.date === dk);
-    let staffStart, staffEnd;
-    if (shiftRec) {
-      if (shiftRec.is_off) { d.setDate(d.getDate() + 1); continue; }
-      staffStart = parseFloat(shiftRec.start_time);
-      staffEnd = parseFloat(shiftRec.end_time);
-    } else {
-      const fallback = getStaffShift(searchSelectedStaff, d);
-      if (!fallback) { d.setDate(d.getDate() + 1); continue; }
-      staffStart = fallback.start;
-      staffEnd = fallback.end;
-    }
+    const dayStaffSlots = []; // { staffName, staffColor, slots[] }
 
-    // その日の予約を取得（施術系のみ、休憩・業務は除外）
-    const dayRes = reservations
-      .filter(r => r.date === dk && r.type !== 'break' && r.type !== 'task' && r.type !== 'practice')
-      .map(r => {
-        const [sh, sm] = r.start_time.split(':').map(Number);
-        const [eh, em] = r.end_time.split(':').map(Number);
-        return { start: sh * 60 + sm, end: eh * 60 + em };
-      })
-      .sort((a, b) => a.start - b.start);
+    for (const sid of searchSelectedStaffs) {
+      const s = staff.find(st => st.id === sid);
+      if (!s) continue;
 
-    // 空き枠算出
-    const staffStartMin = staffStart * 60;
-    const staffEndMin = staffEnd * 60;
-    const slots = [];
-    let cursor = staffStartMin;
-
-    dayRes.forEach(r => {
-      if (cursor + duration <= r.start) {
-        // cursorからr.startまでに入る開始時刻を列挙（15分単位）
-        for (let t = cursor; t + duration <= r.start; t += 15) {
-          slots.push(t);
-        }
+      // シフト確認
+      const shiftRec = shifts.find(sh => sh.date === dk && sh.staff_id === sid);
+      let staffStart, staffEnd;
+      if (shiftRec) {
+        if (shiftRec.is_off) continue;
+        staffStart = parseFloat(shiftRec.start_time);
+        staffEnd = parseFloat(shiftRec.end_time);
+      } else {
+        const fallback = getStaffShift(sid, d);
+        if (!fallback) continue;
+        staffStart = fallback.start;
+        staffEnd = fallback.end;
       }
-      cursor = Math.max(cursor, r.end);
-    });
-    // 最後の予約後
-    for (let t = cursor; t + duration <= staffEndMin; t += 15) {
-      slots.push(t);
-    }
 
-    if (slots.length > 0) {
-      // 連続する15分刻みをまとめて範囲表示
-      const displaySlots = [];
-      let rangeStart = slots[0];
-      let prev = slots[0];
-      for (let i = 1; i <= slots.length; i++) {
-        if (i < slots.length && slots[i] === prev + 15) {
-          prev = slots[i];
-        } else {
-          if (rangeStart === prev) {
-            displaySlots.push(formatMin(rangeStart) + '〜');
-          } else {
-            displaySlots.push(formatMin(rangeStart) + '〜' + formatMin(prev) + '開始');
+      // その日のそのスタッフの予約（施術系のみ）
+      const dayRes = reservations
+        .filter(r => r.date === dk && r.staff_id === sid && r.type !== 'break' && r.type !== 'task' && r.type !== 'practice')
+        .map(r => {
+          const [sh, sm] = r.start_time.split(':').map(Number);
+          const [eh, em] = r.end_time.split(':').map(Number);
+          return { start: sh * 60 + sm, end: eh * 60 + em };
+        })
+        .sort((a, b) => a.start - b.start);
+
+      // 空き枠算出
+      const staffStartMin = staffStart * 60;
+      const staffEndMin = staffEnd * 60;
+      const slots = [];
+      let cursor = staffStartMin;
+
+      dayRes.forEach(r => {
+        if (cursor + duration <= r.start) {
+          for (let t = cursor; t + duration <= r.start; t += 15) {
+            slots.push(t);
           }
-          if (i < slots.length) { rangeStart = slots[i]; prev = slots[i]; }
         }
+        cursor = Math.max(cursor, r.end);
+      });
+      for (let t = cursor; t + duration <= staffEndMin; t += 15) {
+        slots.push(t);
       }
+
+      if (slots.length > 0) {
+        // 連続する15分刻みをまとめて範囲表示
+        const displaySlots = [];
+        let rangeStart = slots[0];
+        let prev = slots[0];
+        for (let i = 1; i <= slots.length; i++) {
+          if (i < slots.length && slots[i] === prev + 15) {
+            prev = slots[i];
+          } else {
+            if (rangeStart === prev) {
+              displaySlots.push(formatMin(rangeStart) + '〜');
+            } else {
+              displaySlots.push(formatMin(rangeStart) + '〜' + formatMin(prev) + '開始');
+            }
+            if (i < slots.length) { rangeStart = slots[i]; prev = slots[i]; }
+          }
+        }
+        dayStaffSlots.push({ name: s.name.split(' ')[0], color: s.color, slots: displaySlots });
+      }
+    }
+
+    if (dayStaffSlots.length > 0) {
       const dowLabel = ['日','月','火','水','木','金','土'][dow];
       results.push({
         date: `${d.getMonth()+1}/${d.getDate()}(${dowLabel})`,
-        slots: displaySlots,
+        staffSlots: dayStaffSlots,
         dk: dk
       });
     }
@@ -1919,12 +1948,15 @@ async function executeSearch() {
     return;
   }
 
-  resultsEl.innerHTML = results.map(r =>
-    `<div class="search-result-day" data-dk="${r.dk}">
+  resultsEl.innerHTML = results.map(r => {
+    const staffLines = r.staffSlots.map(ss =>
+      `<div style="font-size:12px;padding:2px 0"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ss.color};margin-right:4px"></span><strong>${ss.name}</strong> ${ss.slots.join('、')}</div>`
+    ).join('');
+    return `<div class="search-result-day" data-dk="${r.dk}">
       <span class="date-label">${r.date}</span>
-      <span class="slots">${r.slots.join('、')}</span>
-    </div>`
-  ).join('');
+      ${staffLines}
+    </div>`;
+  }).join('');
 
   // タップで予約表に飛ぶ
   resultsEl.querySelectorAll('.search-result-day').forEach(el => {
