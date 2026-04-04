@@ -1377,7 +1377,6 @@ function renderGrid() {
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
-      }
       html += '</div>';
       // アフターケア線（予約枠の外、time-cells上に直接配置）
       if (res.aftercareEnd && type === 'treatment') {
