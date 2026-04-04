@@ -1269,6 +1269,29 @@ function renderGrid() {
         style += `;top:${h * ol.index}%;bottom:${100 - h * (ol.index + 1)}%`;
       }
 
+      // 分担がある場合、背景をグラデーションで色分け
+      if (res.subAssignments && res.subAssignments.length > 0 && type === 'treatment') {
+        const totalMin = eMin - sMin;
+        if (totalMin > 0) {
+          const stops = [];
+          // メインスタッフの色を先頭に
+          let prevPct = 0;
+          res.subAssignments.forEach(sa => {
+            const saStaff = staff.find(st => st.id === sa.staffId);
+            const saColor = saStaff ? saStaff.color : '#9CA3AF';
+            const [ssh, ssm] = sa.start.split(':').map(Number);
+            const [seh, sem] = sa.end.split(':').map(Number);
+            const saStart = ((ssh - bh.start) * 60 + ssm - sMin) / totalMin * 100;
+            const saEnd = ((seh - bh.start) * 60 + sem - sMin) / totalMin * 100;
+            if (saStart > prevPct) stops.push(`${color} ${prevPct}%, ${color} ${saStart}%`);
+            stops.push(`${saColor} ${saStart}%, ${saColor} ${saEnd}%`);
+            prevPct = saEnd;
+          });
+          if (prevPct < 100) stops.push(`${color} ${prevPct}%, ${color} 100%`);
+          style += `;background:linear-gradient(to right,${stops.join(',')})`;
+        }
+      }
+
       html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
