@@ -671,7 +671,9 @@ function toggleShift() {
   const scroll = document.querySelector('.grid-scroll');
   area.classList.toggle('open', shiftOpen);
   bar.classList.toggle('open', shiftOpen);
-  scroll.classList.toggle('scrollable', shiftOpen);
+  // スマホのみscrollable（PC/iPadは画面広いのでflex伸縮で対応）
+  const isSmall = window.innerHeight < 500;
+  scroll.classList.toggle('scrollable', shiftOpen && isSmall);
 }
 
 function renderChecklist() {
