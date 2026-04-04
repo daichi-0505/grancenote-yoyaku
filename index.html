@@ -415,7 +415,12 @@ body {
 .detail-toggle.open .arrow { transform: rotate(90deg); }
 .detail-section { display: none; padding: 8px 0; }
 .detail-section.open { display: block; }
-.sub-block { z-index: 3; pointer-events: none; border-radius: 5px; opacity: 0.95; }
+.sub-block { z-index: 3; pointer-events: none; border-radius: 5px; opacity: 0.95; padding: 0; }
+.res-text-layer {
+  position: absolute; top: 2px; bottom: 2px; z-index: 5; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 2px 4px; overflow: hidden;
+}
 .sub-assignment {
   display: flex; align-items: center; gap: 6px; padding: 4px 0;
   border-bottom: 1px solid var(--border-default);
@@ -1270,7 +1275,10 @@ function renderGrid() {
         style += `;top:${h * ol.index}%;bottom:${100 - h * (ol.index + 1)}%`;
       }
 
-      html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
+      // 色ブロック（背景のみ）
+      html += `<div class="${cls}" style="${style}"></div>`;
+      // 文字レイヤー（最上位、タップ可能）
+      html += `<div class="res-text-layer" style="left:${left}%;width:${width}%" data-id="${res.id}">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
       html += `<span class="res-time-label">${res.start}〜</span>`;
@@ -1341,7 +1349,7 @@ function renderGrid() {
       openAddModal(ov.dataset.room, h, m, bh);
     });
   });
-  wrapper.querySelectorAll('.reservation').forEach(el => {
+  wrapper.querySelectorAll('.res-text-layer').forEach(el => {
     el.addEventListener('click', e => {
       e.stopPropagation();
       const res = dayReservations.find(r => r.id === el.dataset.id);
