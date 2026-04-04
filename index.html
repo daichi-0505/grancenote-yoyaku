@@ -1948,53 +1948,36 @@ async function executeSearch() {
     return;
   }
 
-  // スタッフ別にグループ化して日時を羅列
-  const staffGroups = {};
+  // 全スタッフの空き枠をマージ（重複除外）
+  const mergedLines = []; // { date, slot, dk }
+  const seen = new Set();
   results.forEach(r => {
+    // 全スタッフの空きスロット(分単位)を集めてユニーク化
+    const allSlots = new Set();
     r.staffSlots.forEach(ss => {
-      if (!staffGroups[ss.name]) staffGroups[ss.name] = { color: ss.color, lines: [] };
-      ss.slots.forEach(slot => {
-        staffGroups[ss.name].lines.push(`${r.date} ${slot}`);
-      });
+      ss.slots.forEach(slot => allSlots.add(slot));
+    });
+    Array.from(allSlots).sort().forEach(slot => {
+      const key = `${r.date} ${slot}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        mergedLines.push({ date: r.date, slot, dk: r.dk });
+      }
     });
   });
 
   // コピー用テキスト生成
-  let copyLines = [];
-  results.forEach(r => {
-    r.staffSlots.forEach(ss => {
-      ss.slots.forEach(slot => {
-        copyLines.push(`・${r.date} ${slot}`);
-      });
-    });
-  });
+  const copyLines = mergedLines.map(l => `・${l.date} ${l.slot}`);
   const copyText = `【ご案内可能日時】\n${copyLines.join('\n')}\n\nご都合いかがでしょうか☺️`;
 
-  // 表示: スタッフ名は上、日時は下に羅列
+  // 表示
   let html = '';
-  // スタッフ名表示
-  const staffNames = Object.keys(staffGroups);
-  html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">`;
-  staffNames.forEach(name => {
-    const g = staffGroups[name];
-    html += `<span style="font-size:12px;font-weight:800;color:${g.color}">●${name}</span>`;
-  });
-  html += `</div>`;
-
-  // コピーボタン
   html += `<button class="btn btn-primary" id="copySearchResult" style="width:100%;margin-bottom:10px;font-size:13px">📋 コピー</button>`;
-
-  // 日時リスト
   html += `<div class="search-results">`;
-  results.forEach(r => {
-    r.staffSlots.forEach(ss => {
-      ss.slots.forEach(slot => {
-        html += `<div class="search-result-day" data-dk="${r.dk}" style="display:flex;align-items:center;gap:6px">
-          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ss.color};flex-shrink:0"></span>
-          <span class="date-label">${r.date} ${slot}</span>
-        </div>`;
-      });
-    });
+  mergedLines.forEach(l => {
+    html += `<div class="search-result-day" data-dk="${l.dk}">
+      <span class="date-label">・${l.date} ${l.slot}</span>
+    </div>`;
   });
   html += `</div>`;
 
