@@ -50,6 +50,14 @@ body {
   }
 }
 
+/* 回転時のガクつき防止: オーバーレイで隠す */
+.rotation-shield {
+  position: fixed; inset: 0; background: var(--bg-primary);
+  z-index: 998; pointer-events: none; opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.rotation-shield.active { opacity: 1; transition: none; }
+
 /* ── Loading ── */
 .loading-overlay {
   position: fixed; inset: 0; background: var(--bg-primary);
@@ -349,6 +357,7 @@ body {
 </head>
 <body>
 
+<div class="rotation-shield" id="rotationShield"></div>
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
   <div class="loading-text">読み込み中...</div>
@@ -937,7 +946,16 @@ function forceLandscape() {
   const landscapeH = Math.min(screen.width, screen.height);
   document.documentElement.style.setProperty('--landscape-w', landscapeW + 'px');
   document.documentElement.style.setProperty('--landscape-h', landscapeH + 'px');
-  // モバイル回転時の再描画なし（CSSが自動処理）
+  // 回転時: オーバーレイで隠してガクつきを見せない
+  const shield = document.getElementById('rotationShield');
+  let orientationTimer;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth < 1024) {
+      shield.classList.add('active');
+      clearTimeout(orientationTimer);
+      orientationTimer = setTimeout(() => shield.classList.remove('active'), 400);
+    }
+  });
 }
 
 // ── 初期化 ──
