@@ -142,8 +142,10 @@ body {
 
 /* ── Grid ── */
 .grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 0 12px 8px 12px; }
-.grid-scroll { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.grid-scroll { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .grid-scroll.scrollable { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.grid-scroll.scrollable .grid-table { flex: none; }
+.grid-scroll.scrollable .room-row { height: 44px; flex: none; }
 .grid-table { display: flex; flex-direction: column; width: 100%; border: 2px solid var(--accent); border-radius: 6px; overflow: hidden; flex: 1; }
 
 /* Memo space */
