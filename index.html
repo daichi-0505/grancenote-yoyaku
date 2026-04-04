@@ -538,12 +538,17 @@ async function apiGet(params) {
 }
 
 async function apiWrite(params) {
-  if (!useApi) return null;
+  if (!useApi) { console.warn('API未接続: データはlocalStorageに保存'); return null; }
   showSync(true);
   try {
     const url = API_URL + '?' + new URLSearchParams(params).toString();
     const res = await fetch(url);
-    return res.json();
+    const json = await res.json();
+    if (!json.ok) console.error('API書込エラー:', json.error);
+    return json;
+  } catch(e) {
+    console.error('API通信エラー:', e);
+    return null;
   } finally {
     showSync(false);
   }

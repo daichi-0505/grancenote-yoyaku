@@ -1,6 +1,6 @@
-// 予約帳 Service Worker v1
-// ネットワーク優先（常に最新データを取得）
-const CACHE_NAME = 'yoyaku-v1';
+// 予約帳 Service Worker v2
+// キャッシュなし。常にネットワークから取得。
+const CACHE_NAME = 'yoyaku-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {
@@ -12,19 +12,5 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // API calls: always network
-  if (event.request.url.includes('script.google.com')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-  // App shell: network first, cache fallback
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
+  event.respondWith(fetch(event.request));
 });
