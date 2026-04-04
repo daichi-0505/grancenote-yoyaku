@@ -142,7 +142,8 @@ body {
 
 /* ── Grid ── */
 .grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 0 12px 8px 12px; }
-.grid-scroll { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.grid-scroll { flex: 1; display: flex; flex-direction: column; overflow: hidden; transition: none; }
+.grid-scroll.scrollable { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .grid-table { display: flex; flex-direction: column; width: 100%; border: 2px solid var(--accent); border-radius: 6px; overflow: hidden; flex: 1; }
 
 /* Memo space */
@@ -152,28 +153,40 @@ body {
 .staff-status-bar {
   background: var(--bg-card); border-bottom: 1px solid var(--border-default);
   padding: 2px 12px; display: flex; gap: 6px; flex-shrink: 0; align-items: center;
+  cursor: pointer; user-select: none;
 }
 .staff-status-label {
   font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px;
-  margin-right: 4px; white-space: nowrap;
+  white-space: nowrap; display: flex; align-items: center; gap: 4px;
 }
+.staff-toggle-icon {
+  font-size: 8px; transition: transform 0.2s;
+}
+.staff-status-bar.open .staff-toggle-icon { transform: rotate(180deg); }
 .staff-chip {
   display: flex; align-items: center; gap: 3px; padding: 2px 8px;
   border-radius: 10px; font-size: 10px; font-weight: 800;
-  border: none; cursor: pointer; color: #fff;
-  transition: all .15s; white-space: nowrap;
+  border: none; color: #fff; white-space: nowrap;
 }
 .staff-chip.inactive { opacity: 0.3; }
 
-/* シフトバー（大画面用） */
+/* シフトバー（アコーディオン） */
+.shift-area {
+  max-height: 0; overflow: hidden; transition: max-height 0.25s ease;
+  flex-shrink: 0; background: var(--bg-card);
+  border-bottom: 1px solid transparent;
+}
+.shift-area.open {
+  max-height: 300px;
+  border-bottom-color: var(--border-default);
+}
 .shift-bar-row {
   display: flex; flex-shrink: 0; height: 18px;
-  background: var(--bg-card);
 }
 .shift-bar-cells { flex: 1; position: relative; margin-right: 20px; }
 .shift-line {
   position: absolute; top: 3px; height: 12px;
-  border-radius: 6px; opacity: 0.7;
+  border-radius: 6px; opacity: 0.85;
   display: flex; align-items: center; padding-left: 4px;
   font-size: 8px; font-weight: 800; color: #fff; overflow: hidden; white-space: nowrap;
 }
@@ -205,8 +218,12 @@ body {
 
 /* Room rows */
 .room-row {
-  display: flex; flex: 1; min-height: 34px;
+  display: flex; height: 44px; flex-shrink: 0;
   border-bottom: 1px solid var(--border-default);
+}
+/* シフト閉じてる時: 画面に合わせて伸縮 */
+.grid-scroll:not(.scrollable) .room-row {
+  flex: 1; min-height: 34px; height: auto;
 }
 .room-row.section-divider { border-top: 2.5px solid var(--accent); }
 .room-label {
@@ -394,7 +411,7 @@ body {
 </div>
 
 <div class="staff-status-bar" id="staffStatusBar"></div>
-<div class="memo-space"></div>
+<div class="shift-area" id="shiftArea"></div>
 <div class="grid-wrapper" id="gridWrapper"></div>
 
 <!-- Reservation Modal -->
@@ -601,9 +618,15 @@ function renderHeader() {
   document.getElementById('datePicker').value = dateKey(d);
 }
 
+let shiftOpen = false;
+
 function renderStaffStatus() {
   const bar = document.getElementById('staffStatusBar');
-  bar.innerHTML = '<span class="staff-status-label">出勤</span>';
+  bar.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'staff-status-label';
+  label.innerHTML = `出勤を表示 <span class="staff-toggle-icon">▼</span>`;
+  bar.appendChild(label);
   staff.forEach(s => {
     const shift = getStaffShift(s.id, currentDate);
     const chip = document.createElement('span');
@@ -613,6 +636,40 @@ function renderStaffStatus() {
     chip.title = s.name + (shift ? ` (${shift.start}:00-${shift.end}:00)` : ' (休み)');
     bar.appendChild(chip);
   });
+  bar.onclick = toggleShift;
+  if (shiftOpen) bar.classList.add('open');
+  else bar.classList.remove('open');
+}
+
+function renderShiftBars() {
+  const area = document.getElementById('shiftArea');
+  const bh = getBH(currentDate);
+  if (!bh) { area.innerHTML = ''; return; }
+  const labelW = getLabelW();
+  const totalH = bh.end - bh.start;
+  let html = '';
+  staff.forEach(s => {
+    const shift = getStaffShift(s.id, currentDate);
+    if (!shift) return;
+    html += `<div class="shift-bar-row">`;
+    html += `<div class="corner-cell" style="width:${labelW}px"></div>`;
+    html += `<div class="shift-bar-cells">`;
+    const left = (shift.start - bh.start) / totalH * 100;
+    const width = (shift.end - shift.start) / totalH * 100;
+    html += `<div class="shift-line" style="left:${left}%;width:${width}%;background:${s.color}">${s.name.split(' ')[0]} ${shift.start}:00-${shift.end}:00</div>`;
+    html += `</div></div>`;
+  });
+  area.innerHTML = html;
+}
+
+function toggleShift() {
+  shiftOpen = !shiftOpen;
+  const area = document.getElementById('shiftArea');
+  const bar = document.getElementById('staffStatusBar');
+  const scroll = document.querySelector('.grid-scroll');
+  area.classList.toggle('open', shiftOpen);
+  bar.classList.toggle('open', shiftOpen);
+  scroll.classList.toggle('scrollable', shiftOpen);
 }
 
 function renderChecklist() {
@@ -659,24 +716,8 @@ function renderGrid() {
   }
   headerHtml += '</div></div>';
 
-  // シフトバー（大画面のみ表示）
-  let shiftHtml = '';
-  if (window.innerWidth >= 768 && window.innerHeight >= 500) {
-    staff.forEach(s => {
-      const shift = getStaffShift(s.id, currentDate);
-      if (!shift) return;
-      shiftHtml += `<div class="shift-bar-row">`;
-      shiftHtml += `<div class="corner-cell" style="width:${labelW}px"></div>`;
-      shiftHtml += `<div class="shift-bar-cells">`;
-      const left = (shift.start - bh.start) / totalH * 100;
-      const width = (shift.end - shift.start) / totalH * 100;
-      shiftHtml += `<div class="shift-line" style="left:${left}%;width:${width}%;background:${s.color}">${s.name.split(' ')[0]} ${shift.start}:00-${shift.end}:00</div>`;
-      shiftHtml += `</div></div>`;
-    });
-  }
-
   // Scrollable room rows
-  let html = headerHtml + shiftHtml + '<div class="grid-table">';
+  let html = headerHtml + '<div class="grid-table">';
   rooms.forEach(room => {
     const dc = room.divider ? ' section-divider' : '';
     html += `<div class="room-row${dc}">`;
@@ -1016,7 +1057,7 @@ function setupLandscape() {
 }
 
 // ── 初期化 ──
-function renderAll() { renderHeader(); renderStaffStatus(); renderGrid(); }
+function renderAll() { renderHeader(); renderStaffStatus(); renderShiftBars(); renderGrid(); }
 
 async function init() {
   setupLandscape();
