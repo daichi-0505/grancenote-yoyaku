@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=800, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#2C3E6B">
@@ -39,7 +39,7 @@ body {
 }
 
 
-/* 縦持ち時:「横に回してください」表示 */
+/* 縦持ち / 画面ロック時:「横にしてください」表示 */
 .portrait-overlay {
   position: fixed; inset: 0; background: #fff;
   z-index: 998; display: none;
@@ -54,13 +54,6 @@ body {
   50% { transform: rotate(90deg); }
 }
 .portrait-overlay .rotate-text { font-size: 16px; font-weight: 800; letter-spacing: 1px; }
-/* 初回は非表示。一度横表示を見た後、縦にした時だけ表示 */
-.portrait-overlay.enabled {
-  display: none;
-}
-@media (orientation: portrait) {
-  .portrait-overlay.enabled { display: flex; }
-}
 
 /* ── Loading ── */
 .loading-overlay {
@@ -958,18 +951,14 @@ document.addEventListener('touchend', e => {
 // ── 横向きロック（PWA時のみ有効） ──
 function setupLandscape() {
   try { screen.orientation.lock('landscape').catch(() => {}); } catch(e) {}
-  // 初回は横レイアウト表示。横を一度見たら、縦にした時だけオーバーレイ表示
   const overlay = document.querySelector('.portrait-overlay');
-  if (window.innerWidth >= window.innerHeight) {
-    // 横で開いた → すぐにenabled（縦にしたら出る）
-    overlay.classList.add('enabled');
-  } else {
-    // 縦で開いた → スケジュールを見せる（オーバーレイなし）。横にしたらenabled
-    const mql = window.matchMedia('(orientation: landscape)');
-    mql.addEventListener('change', e => {
-      if (e.matches) overlay.classList.add('enabled');
-    }, { once: true });
+  function checkOrientation() {
+    // 画面の幅 > 高さなら横表示 → スケジュール表示
+    // そうでなければ（縦 or 画面ロック）→ オーバーレイ
+    overlay.style.display = (window.innerWidth > window.innerHeight) ? 'none' : 'flex';
   }
+  checkOrientation();
+  window.addEventListener('resize', checkOrientation);
 }
 
 // ── 初期化 ──
