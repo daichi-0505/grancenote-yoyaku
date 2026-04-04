@@ -905,7 +905,10 @@ setInterval(() => { if(dateKey(new Date())===dateKey(currentDate)) renderGrid();
 // Auto refresh from server every 2 minutes
 setInterval(async () => { if(useApi) { await loadDayData(); renderChecklist(); renderGrid(); } }, 120000);
 
-window.addEventListener('resize', () => renderGrid());
+// PC窓リサイズ時のみ再描画（モバイル回転時は不要）
+window.addEventListener('resize', () => {
+  if (window.innerWidth >= 1024) renderGrid();
+});
 
 // Offline detection
 window.addEventListener('online', () => document.getElementById('offlineBanner').classList.remove('active'));
@@ -934,9 +937,7 @@ function forceLandscape() {
   const landscapeH = Math.min(screen.width, screen.height);
   document.documentElement.style.setProperty('--landscape-w', landscapeW + 'px');
   document.documentElement.style.setProperty('--landscape-h', landscapeH + 'px');
-  // 回転後にグリッド再描画
-  const mql = window.matchMedia('(orientation: portrait)');
-  mql.addEventListener('change', () => setTimeout(() => renderGrid(), 50));
+  // モバイル回転時の再描画なし（CSSが自動処理）
 }
 
 // ── 初期化 ──
