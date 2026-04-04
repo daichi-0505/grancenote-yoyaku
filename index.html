@@ -125,37 +125,33 @@ body {
 .check-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 
 /* ── Grid ── */
-.grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-.grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.grid-table { display: flex; flex-direction: column; width: 100%; border: 2px solid var(--accent); border-radius: 4px; overflow: hidden; }
+.grid-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 0 12px 8px 12px; }
+.grid-scroll { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.grid-table { display: flex; flex-direction: column; width: 100%; border: 2px solid var(--accent); border-radius: 6px; overflow: hidden; flex: 1; }
 
 /* Memo space */
-.memo-space {
-  flex-shrink: 0; height: 50px; background: var(--bg-card);
-  border-bottom: 1px solid var(--border-default);
-}
+.memo-space { display: none; }
 
-/* Time header */
+/* Time header（枠の外） */
 .time-header-row {
-  display: flex; flex-shrink: 0; height: 22px;
-  border-bottom: 1px solid var(--border-default);
-  background: var(--bg-card);
+  display: flex; flex-shrink: 0; height: 20px;
+  background: transparent;
 }
 .corner-cell {
-  flex-shrink: 0; border-right: 1px solid var(--border-default);
-  background: var(--bg-card);
+  flex-shrink: 0;
+  background: transparent;
 }
 .time-header-cells { flex: 1; display: flex; position: relative; margin-right: 8px; }
 .hour-block {
   position: absolute; bottom: 0; height: 100%;
   display: flex; align-items: flex-end; justify-content: center;
-  font-size: 11px; font-weight: 800; color: var(--text-primary); letter-spacing: 0.5px;
-  transform: translateX(-50%); padding-bottom: 2px;
+  font-size: 11px; font-weight: 800; color: var(--text-secondary); letter-spacing: 0.5px;
+  transform: translateX(-50%); padding-bottom: 1px;
 }
 
 /* Room rows */
 .room-row {
-  display: flex; height: 60px; flex-shrink: 0;
+  display: flex; flex: 1; min-height: 0;
   border-bottom: 1px solid var(--border-default);
 }
 .room-row.section-divider { border-top: 2.5px solid var(--accent); }
@@ -176,9 +172,9 @@ body {
   position: absolute; top: 0; bottom: 0; width: 0;
   pointer-events: none; z-index: 1;
 }
-.grid-line.hour { border-left: 1px solid rgba(44,62,107,0.15); }
-.grid-line.quarter { border-left: 1px solid var(--border-default); }
-.grid-line.half { border-left: 1px dashed rgba(44,62,107,0.10); }
+.grid-line.hour { border-left: 1.5px solid rgba(44,62,107,0.25); }
+.grid-line.quarter { border-left: 1px dashed rgba(44,62,107,0.12); }
+.grid-line.half { border-left: 1px dashed rgba(44,62,107,0.12); }
 .grid-line.end { border-left: 1.5px solid var(--accent); }
 
 /* Reservations */
@@ -309,32 +305,7 @@ body {
   .modal { border-radius: 16px; max-width: 420px; }
 }
 
-/* モバイル共通（常に横表示なので統一スタイル） */
-@media (max-width: 1023px) {
-  .header { padding: 4px 12px; border-bottom-width: 1px; box-shadow: none; }
-  .header-date { font-size: 14px; }
-  .header-dow { font-size: 12px; }
-  .nav-btn { width: 28px; height: 28px; font-size: 14px; border-radius: 6px; }
-  .today-btn { padding: 3px 8px; font-size: 10px; border-radius: 6px; }
-  .settings-btn { padding: 3px 8px; font-size: 10px; }
-  .refresh-btn { padding: 3px 6px; font-size: 13px; }
-  .header-left { gap: 5px; }
-  .header-right { gap: 4px; }
-  .checklist-bar { padding: 3px 12px; gap: 10px; }
-  .check-item { font-size: 11px; }
-  .memo-space { display: none; }
-  .grid-wrapper { padding: 4px 8px 4px 0; }
-  .grid-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .room-row { height: 36px; }
-  .room-label { font-size: 10px; padding: 2px 4px; }
-  .room-sublabel { font-size: 8px; }
-  .time-header-row { height: 18px; }
-  .hour-block { font-size: 9px; }
-  .reservation { top: 2px; bottom: 2px; padding: 1px 3px; }
-  .res-name { font-size: 10px; }
-  .res-menu-label { font-size: 8px; }
-  .res-memo-tag { font-size: 8px; }
-}
+/* viewport 800px固定なのでメディアクエリ不要 — デフォルトが横表示 */
 </style>
 </head>
 <body>
@@ -599,7 +570,7 @@ function renderGrid() {
   headerHtml += '</div></div>';
 
   // Scrollable room rows
-  let html = '<div class="grid-table">' + headerHtml;
+  let html = headerHtml + '<div class="grid-table">';
   rooms.forEach(room => {
     const dc = room.divider ? ' section-divider' : '';
     html += `<div class="room-row${dc}">`;
