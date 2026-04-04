@@ -1297,7 +1297,12 @@ function renderGrid() {
       }
 
       // 予約枠（背景+文字、タップ可能）
-      html += `<div class="${cls}" style="${style}" data-id="${res.id}" onclick="event.stopPropagation();openViewModal(dayReservations.find(r=>r.id==='${res.id}'))">`;
+      if (type === 'break' || type === 'task') {
+        // 休憩・業務はタップで新規追加（stopPropagationしない）、長押しで編集
+        html += `<div class="${cls}" style="${style}" data-id="${res.id}" data-type="${type}">`;
+      } else {
+        html += `<div class="${cls}" style="${style}" data-id="${res.id}" onclick="event.stopPropagation();openViewModal(dayReservations.find(r=>r.id==='${res.id}'))">`;
+      }
       if (isChecked) html += '<span class="res-checkin">✓</span>';
       html += '<div class="res-top">';
       html += `<span class="res-time-label">${res.start}〜</span>`;
@@ -1346,11 +1351,27 @@ function renderGrid() {
 
   // Events: 空白タップで新規追加
   wrapper.querySelectorAll('.time-cells').forEach(tc => {
+    // 長押しで休憩・業務の編集
+    let longPressTimer = null;
+    let longPressed = false;
+    tc.addEventListener('pointerdown', function(e) {
+      const resEl = e.target.closest('[data-id]');
+      if (!resEl) return;
+      const res = dayReservations.find(r => r.id === resEl.dataset.id);
+      if (!res || (res.type !== 'break' && res.type !== 'task')) return;
+      longPressed = false;
+      longPressTimer = setTimeout(() => {
+        longPressed = true;
+        openViewModal(res);
+      }, 500);
+    });
+    tc.addEventListener('pointerup', () => { clearTimeout(longPressTimer); });
+    tc.addEventListener('pointercancel', () => { clearTimeout(longPressTimer); });
+
     tc.onclick = function(e) {
+      if (longPressed) { longPressed = false; return; }
       const resEl = e.target.closest('[data-id]');
       if (resEl) {
-        // 施術・買い物はタップで閲覧モーダル（既存動作）
-        // 休憩・業務はタップを通過させて新規追加可能にする
         const res = dayReservations.find(r => r.id === resEl.dataset.id);
         if (res && (res.type === 'treatment' || res.type === 'shopping')) return;
       }
