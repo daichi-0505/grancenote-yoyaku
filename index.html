@@ -376,9 +376,9 @@ body {
 }
 .res-top { display: flex; align-items: center; gap: 3px; }
 .res-menu-label {
-  font-size: 10px; font-weight: 800; color: #fff;
-  background: rgba(0,0,0,0.2); padding: 1px 4px; border-radius: 3px;
-  line-height: 1.4; white-space: nowrap;
+  font-size: 8px; font-weight: 700; color: #fff;
+  background: rgba(0,0,0,0.15); padding: 0 3px; border-radius: 2px;
+  line-height: 1.3; white-space: nowrap;
 }
 .res-memo-tag {
   font-size: 9px; font-weight: 700; color: rgba(0,0,0,0.5);
@@ -1266,6 +1266,11 @@ function renderGrid() {
 
       html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
+      if (noStaff) {
+        html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
+      } else {
+        html += `<span class="res-name">${res.name}</span>`;
+      }
       html += '<div class="res-top">';
       if (type !== 'treatment' && type !== 'shopping') {
         const typeLabels = { break: '休憩', task: '業務', shopping: '🛒' };
@@ -1274,11 +1279,6 @@ function renderGrid() {
       if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
-      if (noStaff) {
-        html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
-      } else {
-        html += `<span class="res-name">${res.name}</span>`;
-      }
       html += '</div>';
       // アフターケア線（予約枠の外、time-cells上に直接配置）
       if (res.aftercareEnd && type === 'treatment') {
