@@ -558,39 +558,49 @@ async function apiWrite(params) {
 function lsLoad(key, def) { try { const d = localStorage.getItem('rs_' + key); return d ? JSON.parse(d) : JSON.parse(JSON.stringify(def)); } catch { return JSON.parse(JSON.stringify(def)); } }
 function lsSave(key, data) { localStorage.setItem('rs_' + key, JSON.stringify(data)); }
 
-// ── データ読込 ──
-async function loadConfig() {
-  if (useApi) {
-    try {
-      const data = await apiGet({ action: 'getAll' });
-      if (data && data.ok) {
-        staff = data.staff;
-        rooms = data.rooms;
-        checks = data.checks;
-        return;
-      }
-    } catch (e) { console.warn('API error, falling back to localStorage', e); }
-  }
+// ── データ読込（2段階: localStorageで即表示 → APIで最新に更新） ──
+function loadConfigFromCache() {
   staff = lsLoad('staff', DEFAULT_STAFF);
   rooms = lsLoad('rooms', DEFAULT_ROOMS);
   checks = lsLoad('checks', DEFAULT_CHECKS);
 }
 
-async function loadDayData() {
+function loadDayDataFromCache() {
   const dk = dateKey(currentDate);
-  if (useApi) {
-    try {
-      const data = await apiGet({ action: 'getDay', date: dk });
-      if (data && data.ok) {
-        dayReservations = data.reservations;
-        dayCheckStates = data.checkStates;
-        return;
-      }
-    } catch (e) { console.warn('API error, falling back to localStorage', e); }
-  }
   const allRes = lsLoad('reservations', {});
   dayReservations = allRes[dk] || [];
   dayCheckStates = (lsLoad('checkstates', {}))[dk] || {};
+}
+
+function syncConfigFromApi() {
+  if (!useApi) return;
+  apiGet({ action: 'getAll' }).then(data => {
+    if (data && data.ok) {
+      staff = data.staff;
+      rooms = data.rooms;
+      checks = data.checks;
+      lsSave('staff', staff);
+      lsSave('rooms', rooms);
+      lsSave('checks', checks);
+      renderAll();
+    }
+  }).catch(e => console.warn('API config sync error', e));
+}
+
+function syncDayDataFromApi() {
+  if (!useApi) return;
+  const dk = dateKey(currentDate);
+  apiGet({ action: 'getDay', date: dk }).then(data => {
+    if (data && data.ok) {
+      dayReservations = data.reservations;
+      dayCheckStates = data.checkStates;
+      // localStorageにもキャッシュ
+      const allRes = lsLoad('reservations', {});
+      allRes[dk] = dayReservations;
+      lsSave('reservations', allRes);
+      renderGrid();
+    }
+  }).catch(e => console.warn('API day sync error', e));
 }
 
 // ── 営業時間 ──
@@ -929,12 +939,13 @@ async function saveReservation() {
   closeModal('reservationModal');
   renderGrid();
 
+  // localStorageにキャッシュ保存（即表示用）
+  const allRes = lsLoad('reservations', {});
+  allRes[dateKey(currentDate)] = dayReservations;
+  lsSave('reservations', allRes);
+  // APIにも保存
   if (useApi) {
-    await apiWrite({ action: 'saveReservation', data: JSON.stringify(data) });
-  } else {
-    const allRes = lsLoad('reservations', {});
-    allRes[dateKey(currentDate)] = dayReservations;
-    lsSave('reservations', allRes);
+    apiWrite({ action: 'saveReservation', data: JSON.stringify(data) });
   }
 }
 
@@ -946,12 +957,13 @@ async function deleteReservation() {
   closeModal('reservationModal');
   renderGrid();
 
+  // localStorageキャッシュ更新
+  const allRes = lsLoad('reservations', {});
+  allRes[dateKey(currentDate)] = dayReservations;
+  lsSave('reservations', allRes);
+  // APIからも削除
   if (useApi) {
-    await apiWrite({ action: 'deleteReservation', id });
-  } else {
-    const allRes = lsLoad('reservations', {});
-    allRes[dateKey(currentDate)] = dayReservations;
-    lsSave('reservations', allRes);
+    apiWrite({ action: 'deleteReservation', id });
   }
 }
 
@@ -1043,13 +1055,14 @@ document.querySelectorAll('.settings-tab').forEach(tab => {
 function goToDate(newDate) {
   currentDate = newDate;
   currentDate.setHours(0,0,0,0);
-  // 即座にUI更新（データは空でもグリッド構造は表示）
-  dayReservations = [];
-  dayCheckStates = {};
+  // 1. localStorageキャッシュから即表示
+  loadDayDataFromCache();
   renderHeader();
+  renderStaffStatus();
+  renderShiftBars();
   renderGrid();
-  // バックグラウンドでデータ取得→再描画
-  loadDayData().then(() => { renderChecklist(); renderGrid(); });
+  // 2. バックグラウンドでAPI最新データ取得→反映
+  syncDayDataFromApi();
 }
 
 function changeDate(offset) {
@@ -1085,7 +1098,7 @@ document.getElementById('refreshBtn').addEventListener('click', async () => {
 // Now line update
 setInterval(() => { if(dateKey(new Date())===dateKey(currentDate)) renderGrid(); }, 60000);
 // Auto refresh from server every 2 minutes
-setInterval(async () => { if(useApi) { await loadDayData(); renderChecklist(); renderGrid(); } }, 120000);
+setInterval(() => syncDayDataFromApi(), 120000);
 
 // PC窓リサイズ時のみ再描画（モバイル回転時は不要）
 window.addEventListener('resize', () => {
@@ -1121,14 +1134,17 @@ function setupLandscape() {
 // ── 初期化 ──
 function renderAll() { renderHeader(); renderStaffStatus(); renderShiftBars(); renderGrid(); }
 
-async function init() {
+function init() {
   setupLandscape();
-  await loadConfig();
-  await loadDayData();
+  // 1. localStorageから即表示（0秒）
+  loadConfigFromCache();
+  loadDayDataFromCache();
   renderAll();
   document.getElementById('loadingOverlay').classList.add('hidden');
-  // ブラウザのレイアウト確定後にもう一度描画（初回の幅ズレ対策）
   requestAnimationFrame(() => { setTimeout(() => renderAll(), 50); });
+  // 2. バックグラウンドでAPIから最新データを取得→反映
+  syncConfigFromApi();
+  syncDayDataFromApi();
 }
 
 init();
