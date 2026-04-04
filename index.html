@@ -29,13 +29,23 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { height: 100dvh; overflow: hidden; }
 body {
   font-family: -apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;
   background: var(--bg-primary); overflow: hidden;
-  height: 100dvh; display: flex; flex-direction: column;
+  height: 100%; display: flex; flex-direction: column;
   color: var(--text-primary);
-  padding-top: var(--safe-top);
-  padding-bottom: var(--safe-bottom);
+}
+
+/* スマホ縦持ち時: 強制横表示（画面を90度回転） */
+@media (orientation: portrait) and (max-width: 768px) {
+  html {
+    width: 100dvh; height: 100dvw;
+    transform: rotate(90deg);
+    transform-origin: top left;
+    position: absolute; top: 0; left: 100dvw;
+    overflow: hidden;
+  }
 }
 
 /* ── Loading ── */
@@ -308,28 +318,8 @@ body {
   .modal { border-radius: 16px; max-width: 420px; }
 }
 
-/* スマホ縦: スクロールで見る、各行は十分な高さ */
-@media (max-width: 480px) and (orientation: portrait) {
-  .header { padding: 6px 10px; gap: 4px; }
-  .header-date { font-size: 16px; }
-  .header-dow { font-size: 13px; }
-  .nav-btn { width: 32px; height: 32px; font-size: 16px; }
-  .today-btn { padding: 5px 10px; font-size: 11px; }
-  .settings-btn { padding: 5px 8px; font-size: 11px; }
-  .refresh-btn { padding: 5px 8px; font-size: 14px; }
-  .room-label { font-size: 11px; padding: 2px 4px; }
-  .room-sublabel { font-size: 9px; }
-  .hour-block { font-size: 10px; }
-  .checklist-bar { padding: 4px 10px; gap: 12px; }
-  .check-item { font-size: 12px; }
-  .memo-space { height: 30px; }
-  .room-row { height: 56px; }
-  .res-name { font-size: 11px; }
-  .res-menu-label { font-size: 9px; }
-}
-
-/* スマホ横: 全部屋を1画面に収める。スクロール不要 */
-@media (orientation: landscape) and (max-height: 500px) {
+/* スマホ（縦持ちでも強制横表示されるので、実質全てランドスケープ） */
+@media (max-height: 500px) {
   .header { padding: 2px 10px; border-bottom-width: 1px; box-shadow: none; }
   .header-date { font-size: 13px; letter-spacing: 0; }
   .header-dow { font-size: 11px; }
