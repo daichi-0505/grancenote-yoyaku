@@ -375,6 +375,8 @@ body {
   height: 4px; z-index: 4; pointer-events: none; border-radius: 2px;
 }
 .res-top { display: flex; align-items: center; gap: 3px; }
+.res-bottom { display: flex; align-items: center; gap: 3px; }
+.res-time-label { font-size: 9px; font-weight: 700; opacity: 0.7; white-space: nowrap; flex-shrink: 0; }
 .res-menu-label {
   font-size: 8px; font-weight: 700; color: #fff;
   background: rgba(0,0,0,0.15); padding: 0 3px; border-radius: 2px;
@@ -1266,12 +1268,15 @@ function renderGrid() {
 
       html += `<div class="${cls}" style="${style}" data-id="${res.id}">`;
       if (isChecked) html += '<span class="res-checkin">✓</span>';
+      html += '<div class="res-top">';
+      html += `<span class="res-time-label">${res.start}〜</span>`;
       if (noStaff) {
         html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
       } else {
         html += `<span class="res-name">${res.name}</span>`;
       }
-      html += '<div class="res-top">';
+      html += '</div>';
+      html += '<div class="res-bottom">';
       if (type !== 'treatment' && type !== 'shopping') {
         const typeLabels = { break: '休憩', task: '業務', shopping: '🛒' };
         html += `<span class="res-type-tag">${typeLabels[type] || type}</span>`;
