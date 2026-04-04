@@ -859,7 +859,7 @@ async function syncDayDataFromApi() {
         type: r.type || 'treatment', checkedIn: r.checked_in || false,
         aftercareEnd: r.aftercare_end || null,
         aftercareStaffId: r.aftercare_staff_id || null,
-        subAssignments: r.sub_assignments || null,
+        subAssignments: r.sub_assignments ? (typeof r.sub_assignments === 'string' ? JSON.parse(r.sub_assignments) : r.sub_assignments) : null,
       }));
       const allRes = lsLoad('reservations', {});
       allRes[dk] = dayReservations;
