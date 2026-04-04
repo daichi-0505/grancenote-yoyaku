@@ -926,16 +926,13 @@ function forceLandscape() {
     }
   } catch(e) {}
 
-  // CSS回転によるフォールバック
-  function checkOrientation() {
-    const isPortrait = window.innerHeight > window.innerWidth;
-    document.documentElement.classList.toggle('force-landscape', isPortrait);
-    // 回転後にグリッドを再描画
+  // 初回のみ: 縦で開いたらCSS回転を適用し、以降は固定
+  const isPortrait = window.innerHeight > window.innerWidth;
+  if (isPortrait) {
+    document.documentElement.classList.add('force-landscape');
     setTimeout(() => renderGrid(), 100);
   }
-  checkOrientation();
-  window.addEventListener('resize', checkOrientation);
-  window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 200));
+  // 以降の回転イベントは無視（横のまま固定）
 }
 
 // ── 初期化 ──
