@@ -1,6 +1,6 @@
-// 予約帳 Service Worker v3
+// 予約帳 Service Worker v4 — カルテ連携対応
 // キャッシュなし。常にネットワークから取得。
-const CACHE_NAME = 'yoyaku-v3';
+const CACHE_NAME = 'yoyaku-v4';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {
