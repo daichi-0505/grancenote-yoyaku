@@ -685,7 +685,13 @@ body {
         <button class="type-btn" data-type="block">🚫 ブロック</button>
       </div>
       <div id="treatmentFields">
-        <div class="form-group"><label>お客様名</label><input type="text" id="resName" placeholder="山田 花子 様" autocomplete="off"></div>
+        <div class="form-group" style="position:relative;">
+          <label>お客様名</label>
+          <input type="text" id="resName" placeholder="山田 花子 様" autocomplete="off">
+          <input type="hidden" id="resCustomerId" value="">
+          <div id="customerSuggest" style="display:none;position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:8px;max-height:160px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+        </div>
+        <div id="karteLink" style="display:none;margin:-4px 0 8px;"><a id="karteLinkUrl" href="#" target="_blank" style="color:var(--accent);font-size:12px;font-weight:700;text-decoration:none;">&#128203; カルテを見る</a></div>
         <div class="form-group"><label>メニュー</label><input type="text" id="resMenu" placeholder="フェイシャル" value="フェイシャル" autocomplete="off"></div>
       </div>
       <div id="practiceFields" style="display:none">
@@ -987,6 +993,7 @@ async function syncDayDataFromApi() {
         practiceStaffIds: r.practice_staff_ids ? (typeof r.practice_staff_ids === 'string' ? JSON.parse(r.practice_staff_ids) : r.practice_staff_ids) : null,
         blockRoomIds: r.block_room_ids ? (typeof r.block_room_ids === 'string' ? JSON.parse(r.block_room_ids) : r.block_room_ids) : null,
         blockStaffIds: r.block_staff_ids ? (typeof r.block_staff_ids === 'string' ? JSON.parse(r.block_staff_ids) : r.block_staff_ids) : null,
+        customerId: r.customer_id || null,
       }));
       const allRes = lsLoad('reservations', {});
       allRes[dk] = dayReservations;
@@ -1726,6 +1733,8 @@ function openAddModal(roomId, hour, mins, bh) {
   setType('treatment');
   document.getElementById('modalTitle').textContent = '予約を追加';
   document.getElementById('resName').value = '';
+  document.getElementById('resCustomerId').value = '';
+  document.getElementById('karteLink').style.display = 'none';
   document.getElementById('resMenu').value = 'フェイシャル';
   document.getElementById('resMemo').value = '';
   document.getElementById('resCheckedIn').checked = false;
@@ -1797,6 +1806,11 @@ function openViewModal(res) {
   }
 
   html += `</div>`;
+  // カルテリンク（customer_idがあれば表示）
+  if (res.customerId) {
+    html += `<div style="padding:4px 16px"><a href="${KARTE_APP_URL}?customer_id=${res.customerId}" target="_blank" style="color:var(--accent);font-size:13px;font-weight:700;text-decoration:none;">&#128203; カルテを見る</a></div>`;
+  }
+
   html += `<div class="modal-footer">`;
   if (!res.checkedIn) {
     html += `<button class="btn btn-primary" style="background:var(--success)" onclick="quickCheckIn('${res.id}')">✓ 来店チェック</button>`;
@@ -2175,6 +2189,14 @@ function openEditModal(res) {
   setType(type);
   document.getElementById('modalTitle').textContent = '編集';
   document.getElementById('resName').value = res.name;
+  // カルテ連携: customer_idが保存されていればカルテリンクを表示
+  document.getElementById('resCustomerId').value = res.customerId || '';
+  if (res.customerId) {
+    document.getElementById('karteLinkUrl').href = KARTE_APP_URL + '?customer_id=' + res.customerId;
+    document.getElementById('karteLink').style.display = 'block';
+  } else {
+    document.getElementById('karteLink').style.display = 'none';
+  }
   document.getElementById('resMenu').value = res.menu || '';
   document.getElementById('resMemo').value = res.memo || '';
   document.getElementById('resCheckedIn').checked = !!res.checkedIn;
@@ -2325,6 +2347,7 @@ async function saveReservation() {
     practice_staff_ids: data.practiceStaffIds || null,
     block_room_ids: data.blockRoomIds || null,
     block_staff_ids: data.blockStaffIds || null,
+    customer_id: document.getElementById('resCustomerId').value || null,
     updated_at: new Date().toISOString()
   });
 }
@@ -2711,6 +2734,38 @@ async function renderNotifications() {
   } else {
     reminderDiv.innerHTML = '<div class="notif-empty">本日のリマインドはありません</div>';
   }
+}
+
+// ── 顧客検索オートコンプリート（カルテ連携） ──
+const KARTE_APP_URL = 'https://daichi-0505.github.io/grancenote-karte/';
+let customerSearchTimeout = null;
+
+document.getElementById('resName').addEventListener('input', function() {
+  clearTimeout(customerSearchTimeout);
+  const q = this.value.trim();
+  const suggest = document.getElementById('customerSuggest');
+  document.getElementById('resCustomerId').value = '';
+  document.getElementById('karteLink').style.display = 'none';
+  if (q.length < 2) { suggest.style.display = 'none'; return; }
+  customerSearchTimeout = setTimeout(async () => {
+    const results = await sbGet('customers', `name=ilike.*${encodeURIComponent(q)}*&order=name&limit=8`);
+    if (results.length === 0) { suggest.style.display = 'none'; return; }
+    suggest.innerHTML = results.map(c =>
+      `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:13px;" onmousedown="selectCustomer('${c.id}','${c.name.replace(/'/g,"\\'")}','${c.phone||""}')">${c.name}<span style="color:#999;margin-left:8px;font-size:11px;">${c.phone||''}</span></div>`
+    ).join('');
+    suggest.style.display = 'block';
+  }, 300);
+});
+document.getElementById('resName').addEventListener('blur', function() {
+  setTimeout(() => { document.getElementById('customerSuggest').style.display = 'none'; }, 200);
+});
+
+function selectCustomer(id, name, phone) {
+  document.getElementById('resName').value = name;
+  document.getElementById('resCustomerId').value = id;
+  document.getElementById('customerSuggest').style.display = 'none';
+  document.getElementById('karteLinkUrl').href = KARTE_APP_URL + '?customer_id=' + id;
+  document.getElementById('karteLink').style.display = 'block';
 }
 
 // ── 初期化 ──
