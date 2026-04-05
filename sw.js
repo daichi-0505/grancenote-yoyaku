@@ -1,6 +1,6 @@
-// 予約帳 Service Worker v4 — カルテ連携対応
+// 予約帳 Service Worker v5 — フリガナ検索+カルテボタン改善
 // キャッシュなし。常にネットワークから取得。
-const CACHE_NAME = 'yoyaku-v4';
+const CACHE_NAME = 'yoyaku-v5';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {
