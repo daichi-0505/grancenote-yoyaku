@@ -2821,10 +2821,17 @@ function selectCustomer(id, name, phone, duration) {
     const startVal = document.getElementById('resStart').value;
     if (startVal) {
       const [sh, sm] = startVal.split(':').map(Number);
-      const totalMin = sh * 60 + sm + duration;
-      const eh = Math.floor(totalMin / 60);
-      const em = totalMin % 60;
+      const startMin = sh * 60 + sm;
+      // 施術終了時間
+      const endMin = startMin + duration;
+      const eh = Math.floor(endMin / 60);
+      const em = endMin % 60;
       document.getElementById('resEnd').value = `${eh}:${String(em).padStart(2, '0')}`;
+      // アフターケア終了 = 開始 + 90分（90分枠ベース）
+      const acMin = startMin + 90;
+      const ach = Math.floor(acMin / 60);
+      const acm = acMin % 60;
+      document.getElementById('resAftercareEnd').value = `${ach}:${String(acm).padStart(2, '0')}`;
     }
   }
 }
