@@ -3077,7 +3077,7 @@ document.getElementById('resName').addEventListener('input', function() {
     const kata = encodeURIComponent(toKata(q));
     const hira = encodeURIComponent(toHira(q));
     const orig = encodeURIComponent(q);
-    const results = await sbGet('customers', `or=(name.ilike.*${orig}*,name_kana.ilike.*${kata}*,name_kana.ilike.*${hira}*,phone.ilike.*${orig}*)&select=id,name,phone,default_duration,membership_plan&order=name&limit=8`);
+    const results = await sbGet('customers', `or=(name.ilike.${orig}*,name_kana.ilike.${kata}*,name_kana.ilike.${hira}*)&select=id,name,phone,default_duration,membership_plan&order=name&limit=8`);
     if (results.length === 0) { suggest.style.display = 'none'; return; }
     suggest.innerHTML = results.map(c =>
       `<div style="padding:12px 14px;cursor:pointer;border-bottom:1px solid #eee;font-size:15px;font-weight:600;" onmousedown="selectCustomer('${c.id}','${c.name.replace(/'/g,"\\'")}','${c.phone||""}',${c.default_duration||60})">${c.name}<span style="color:#999;margin-left:8px;font-size:12px;font-weight:400;">${c.membership_plan ? c.membership_plan+' ' : ''}${c.default_duration||60}分${c.phone ? ' / '+c.phone : ''}</span></div>`
