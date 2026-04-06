@@ -662,6 +662,19 @@ body {
 <div class="sync-indicator" id="syncIndicator"></div>
 <div class="offline-banner" id="offlineBanner">オフライン - データの保存ができません</div>
 
+<!-- ドラッグ移動確認モーダル -->
+<div class="modal-overlay" id="dragConfirmModal">
+  <div class="modal" style="max-width:340px;text-align:center;">
+    <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:14px;">予約を移動</div>
+    <div id="dragConfirmName" style="font-size:17px;font-weight:700;margin-bottom:12px;"></div>
+    <div id="dragConfirmDetail" style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-bottom:18px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-cancel" style="flex:1;" onclick="dragConfirmResult(false)">元に戻す</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="dragConfirmResult(true)">確定</button>
+    </div>
+  </div>
+</div>
+
 <div class="header">
   <div class="header-left">
     <button class="nav-btn" id="prevDay">&#8249;</button>
@@ -1617,7 +1630,8 @@ function renderGrid() {
 
   // Events: 空白タップで新規追加 + ドラッグ移動
   const tMin = totalH * 60;
-  let dragState = null; // { res, el, startX, startY, origLeft, origWidth, roomId, tcRect, moved }
+  let dragState = null;
+  let pendingDragAction = null; // {ds, newStart, newEnd, newRoomId} for confirm modal
 
   wrapper.querySelectorAll('.time-cells').forEach(tc => {
     let longPressTimer = null;
@@ -1741,43 +1755,30 @@ function renderGrid() {
           return;
         }
 
-        // 確認モーダル
+        // 確認モーダル表示
         const oldRoom = rooms.find(r => r.id === ds.origRoomId);
         const newRoom = rooms.find(r => r.id === newRoomId);
-        let msg = `${ds.res.name}の予約を移動しますか？\n\n`;
-        if (timeChanged) msg += `時間: ${ds.res.start}〜${ds.res.end} → ${newStart}〜${newEnd}\n`;
-        if (roomChanged) msg += `部屋: ${oldRoom?.name||'?'} → ${newRoom?.name||'?'}`;
+        let detail = '';
+        if (timeChanged) detail += `<div>時間: <strong>${ds.res.start}〜${ds.res.end}</strong> → <strong>${newStart}〜${newEnd}</strong></div>`;
+        if (roomChanged) detail += `<div>部屋: <strong>${oldRoom?.name||'?'}</strong> → <strong>${newRoom?.name||'?'}</strong></div>`;
 
-        dragState = null;
+        document.getElementById('dragConfirmName').textContent = ds.res.name;
+        document.getElementById('dragConfirmDetail').innerHTML = detail;
+        document.getElementById('dragConfirmModal').classList.add('active');
 
-        if (confirm(msg)) {
-          // 更新
-          ds.res.start = newStart;
-          ds.res.end = newEnd;
-          ds.res.roomId = newRoomId;
-          // AC時間も連動
-          if (ds.res.aftercareEnd) {
-            const acDur = (() => {
-              const [ah, am] = ds.res.aftercareEnd.split(':').map(Number);
-              return (ah * 60 + am) - (oeh * 60 + oem);
-            })();
-            const acMin = newEndMin + (bh.start * 60) + acDur;
-            ds.res.aftercareEnd = `${Math.floor(acMin / 60)}:${String(acMin % 60).padStart(2,'0')}`;
-          }
-          renderGrid();
-          // Supabase保存
-          sbUpsert('yoyaku_reservations', {
-            id: ds.res.id, start_time: newStart, end_time: newEnd,
-            room_id: newRoomId, aftercare_end: ds.res.aftercareEnd || null,
-            updated_at: new Date().toISOString()
-          });
-          const allRes = lsLoad('reservations', {});
-          allRes[dateKey(currentDate)] = dayReservations;
-          lsSave('reservations', allRes);
-          showSync(true);
-        } else {
-          renderGrid();
+        // AC時間計算
+        let newAC = ds.res.aftercareEnd;
+        if (ds.res.aftercareEnd) {
+          const acDur = (() => {
+            const [ah, am] = ds.res.aftercareEnd.split(':').map(Number);
+            return (ah * 60 + am) - (oeh * 60 + oem);
+          })();
+          const acMin = newEndMin + (bh.start * 60) + acDur;
+          newAC = `${Math.floor(acMin / 60)}:${String(acMin % 60).padStart(2,'0')}`;
         }
+
+        pendingDragAction = { ds, newStart, newEnd, newRoomId, newAC };
+        dragState = null;
       } else if (dragState) {
         // ドラッグモード入ったが動かなかった → 詳細モーダル表示
         const ghost = document.getElementById('drag-ghost');
@@ -1818,6 +1819,31 @@ function renderGrid() {
       openAddModal(tc.dataset.room, h, m, bh);
     };
   });
+}
+
+// ── ドラッグ確認 ──
+function dragConfirmResult(ok) {
+  document.getElementById('dragConfirmModal').classList.remove('active');
+  if (ok && pendingDragAction) {
+    const { ds, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
+    ds.res.start = newStart;
+    ds.res.end = newEnd;
+    ds.res.roomId = newRoomId;
+    if (newAC) ds.res.aftercareEnd = newAC;
+    renderGrid();
+    sbUpsert('yoyaku_reservations', {
+      id: ds.res.id, start_time: newStart, end_time: newEnd,
+      room_id: newRoomId, aftercare_end: newAC || null,
+      updated_at: new Date().toISOString()
+    });
+    const allRes = lsLoad('reservations', {});
+    allRes[dateKey(currentDate)] = dayReservations;
+    lsSave('reservations', allRes);
+    showSync(true);
+  } else {
+    renderGrid();
+  }
+  pendingDragAction = null;
 }
 
 // ── Modals ──
