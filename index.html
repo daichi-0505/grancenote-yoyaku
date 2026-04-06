@@ -415,6 +415,10 @@ body {
 .reservation.overlap-4 { top: 66%; bottom: 2px; }
 /* チェックイン済み */
 .res-checkin { font-size: 10px; position: absolute; top: 1px; right: 3px; }
+.res-karte-status { position: absolute; bottom: 1px; right: 2px; font-size: 7px; font-weight: 700; padding: 0 3px; border-radius: 3px; line-height: 1.4; }
+.res-ks-none { background: rgba(192,57,43,0.2); color: #C0392B; }
+.res-ks-draft { background: rgba(230,126,34,0.2); color: #E67E22; }
+.res-ks-done { background: rgba(39,174,96,0.2); color: #27AE60; }
 /* アフターケア線（time-cells上に直接配置） */
 .aftercare-line {
   position: absolute; bottom: 4px;
@@ -974,14 +978,25 @@ async function syncConfigFromApi() {
   } catch(e) { console.warn('Config sync error', e); }
 }
 
+let dayKarteStatusMap = {}; // customer_id → karte status for current date
+
 async function syncDayDataFromApi() {
   const dk = dateKey(currentDate);
   try {
-    const [resData, stateData, shiftData] = await Promise.all([
+    const [resData, stateData, shiftData, karteData] = await Promise.all([
       sbGet('yoyaku_reservations', `date=eq.${dk}`),
       sbGet('yoyaku_check_states', `date=eq.${dk}`),
       sbGet('yoyaku_shifts', `date=eq.${dk}`),
+      sbGet('karte_records', `date=eq.${dk}&select=customer_id,status`),
     ]);
+    // カルテステータスマップ構築
+    dayKarteStatusMap = {};
+    if (karteData) {
+      karteData.forEach(kr => {
+        const prev = dayKarteStatusMap[kr.customer_id];
+        if (!prev || kr.status === 'complete') dayKarteStatusMap[kr.customer_id] = kr.status || 'complete';
+      });
+    }
     if (resData) {
       dayReservations = resData.map(r => ({
         id: r.id, date: r.date, name: r.name, menu: r.menu || '',
@@ -1479,6 +1494,13 @@ function renderGrid() {
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
+      // カルテステータスバッジ（施術のみ、顧客紐付あり）
+      if (type === 'treatment' && res.customerId) {
+        const ks = dayKarteStatusMap[res.customerId];
+        if (ks === 'complete') html += '<span class="res-karte-status res-ks-done">済</span>';
+        else if (ks === 'draft') html += '<span class="res-karte-status res-ks-draft">途中</span>';
+        else html += '<span class="res-karte-status res-ks-none">未</span>';
+      }
       html += '</div>';
       // アフターケア線（予約枠の外、time-cells上に直接配置）
       if (res.aftercareEnd && type === 'treatment') {
@@ -1770,6 +1792,13 @@ function openViewModal(res) {
   html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">`;
   html += `<span style="font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-glow);padding:3px 8px;border-radius:6px">${typeLabels[type]}</span>`;
   if (res.checkedIn) html += `<span style="font-size:12px;font-weight:800;color:var(--success);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:6px">✓ 来店済み</span>`;
+  // カルテステータス
+  if (type === 'treatment' && res.customerId) {
+    const ks = dayKarteStatusMap[res.customerId];
+    if (ks === 'complete') html += `<span style="font-size:12px;font-weight:800;color:#27AE60;background:rgba(39,174,96,0.1);padding:3px 8px;border-radius:6px">カルテ記入済</span>`;
+    else if (ks === 'draft') html += `<span style="font-size:12px;font-weight:800;color:#E67E22;background:rgba(230,126,34,0.1);padding:3px 8px;border-radius:6px">カルテ記入途中</span>`;
+    else html += `<span style="font-size:12px;font-weight:800;color:#C0392B;background:rgba(192,57,43,0.1);padding:3px 8px;border-radius:6px">カルテ未記入</span>`;
+  }
   html += `</div>`;
 
   if (res.menu) html += `<div style="font-size:14px;font-weight:700;padding:2px 0">${res.menu}</div>`;
