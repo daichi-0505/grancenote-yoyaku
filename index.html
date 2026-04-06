@@ -336,6 +336,7 @@ body {
   display: flex; flex-direction: column; justify-content: center;
   transition: transform .1s;
   touch-action: none;
+  -webkit-user-select: none; user-select: none;
 }
 .reservation:active { transform: scale(0.98); }
 /* 種別スタイル */
@@ -663,14 +664,14 @@ body {
 <div class="offline-banner" id="offlineBanner">オフライン - データの保存ができません</div>
 
 <!-- ドラッグ移動確認モーダル -->
-<div class="modal-overlay" id="dragConfirmModal">
-  <div class="modal" style="max-width:340px;text-align:center;">
-    <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:14px;">予約を移動</div>
-    <div id="dragConfirmName" style="font-size:17px;font-weight:700;margin-bottom:12px;"></div>
-    <div id="dragConfirmDetail" style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-bottom:18px;"></div>
-    <div style="display:flex;gap:10px;">
-      <button class="btn btn-cancel" style="flex:1;" onclick="dragConfirmResult(false)">元に戻す</button>
-      <button class="btn btn-primary" style="flex:1;" onclick="dragConfirmResult(true)">確定</button>
+<div class="modal-overlay" id="dragConfirmModal" style="z-index:9000;">
+  <div class="modal" style="max-width:420px;width:90%;text-align:center;padding:28px 24px;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.25);-webkit-user-select:none;user-select:none;">
+    <div style="font-size:18px;font-weight:800;color:var(--accent);margin-bottom:16px;letter-spacing:1px;">予約を移動</div>
+    <div id="dragConfirmName" style="font-size:22px;font-weight:800;margin-bottom:16px;"></div>
+    <div id="dragConfirmDetail" style="font-size:16px;color:var(--text-secondary);line-height:2;margin-bottom:24px;"></div>
+    <div style="display:flex;gap:12px;">
+      <button class="btn btn-cancel" style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;" onclick="dragConfirmResult(false)">元に戻す</button>
+      <button class="btn btn-primary" style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;" onclick="dragConfirmResult(true)">確定</button>
     </div>
   </div>
 </div>
