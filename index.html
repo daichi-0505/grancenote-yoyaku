@@ -602,9 +602,50 @@ body {
 }
 
 /* viewport 800px固定なのでメディアクエリ不要 — デフォルトが横表示 */
+
+/* PIN認証画面 */
+#pin-screen { position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:9999; background:#FAF7F2; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+#pin-screen.hidden { display:none; }
+.pin-logo { font-size:22px; font-weight:800; color:#C4A97D; letter-spacing:2px; margin-bottom:4px; }
+.pin-sub { font-size:13px; color:#9CA3AF; margin-bottom:28px; }
+.pin-dots { display:flex; gap:14px; margin-bottom:28px; }
+.pin-dot { width:16px; height:16px; border-radius:50%; border:2px solid #C4A97D; background:transparent; transition:background 0.15s; }
+.pin-dot.filled { background:#C4A97D; }
+.pin-error { font-size:13px; color:#E53E3E; height:20px; margin-bottom:12px; }
+.pin-pad { display:grid; grid-template-columns:repeat(3,72px); gap:10px; }
+.pin-key { width:72px; height:52px; border-radius:12px; border:1px solid #E5E7EB; background:#fff; font-size:22px; font-weight:600; color:#1a1a1a; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; }
+.pin-key:active { background:rgba(196,169,125,0.2); }
+.pin-key.empty { visibility:hidden; }
 </style>
 </head>
 <body>
+
+<!-- PIN認証画面 -->
+<div id="pin-screen">
+  <div class="pin-logo">Gran Cenote</div>
+  <div class="pin-sub">スタッフ認証</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-error" id="pin-error"></div>
+  <div class="pin-pad">
+    <div class="pin-key" onclick="pinInput('1')">1</div>
+    <div class="pin-key" onclick="pinInput('2')">2</div>
+    <div class="pin-key" onclick="pinInput('3')">3</div>
+    <div class="pin-key" onclick="pinInput('4')">4</div>
+    <div class="pin-key" onclick="pinInput('5')">5</div>
+    <div class="pin-key" onclick="pinInput('6')">6</div>
+    <div class="pin-key" onclick="pinInput('7')">7</div>
+    <div class="pin-key" onclick="pinInput('8')">8</div>
+    <div class="pin-key" onclick="pinInput('9')">9</div>
+    <div class="pin-key empty"></div>
+    <div class="pin-key" onclick="pinInput('0')">0</div>
+    <div class="pin-key" onclick="pinDelete()" style="font-size:16px;">&#9003;</div>
+  </div>
+</div>
 
 <div class="portrait-overlay">
   <span class="rotate-icon">&#x1F4F1;</span>
@@ -807,6 +848,37 @@ body {
 </div>
 
 <script>
+// ── PIN認証 ──
+const APP_PIN = '3141';
+let pinValue = '';
+function pinInput(n) {
+  if (pinValue.length >= 4) return;
+  pinValue += n;
+  for (let i = 0; i < 4; i++) document.getElementById('pd' + i).classList.toggle('filled', i < pinValue.length);
+  document.getElementById('pin-error').textContent = '';
+  if (pinValue.length === 4) {
+    setTimeout(() => {
+      if (pinValue === APP_PIN) {
+        localStorage.setItem('pin_auth', 'ok');
+        document.getElementById('pin-screen').classList.add('hidden');
+      } else {
+        document.getElementById('pin-error').textContent = 'PINが違います';
+        pinValue = '';
+        for (let i = 0; i < 4; i++) document.getElementById('pd' + i).classList.remove('filled');
+      }
+    }, 200);
+  }
+}
+function pinDelete() {
+  if (pinValue.length > 0) {
+    pinValue = pinValue.slice(0, -1);
+    for (let i = 0; i < 4; i++) document.getElementById('pd' + i).classList.toggle('filled', i < pinValue.length);
+  }
+}
+if (localStorage.getItem('pin_auth') === 'ok') {
+  document.getElementById('pin-screen').classList.add('hidden');
+}
+
 // ── Supabase API設定 ──
 const SUPABASE_URL = 'https://lheojchyrxjlagxfbgjo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_sV418nh9Akoc0EnxchRU4g_H2FFAa-4';
