@@ -2827,8 +2827,9 @@ function selectCustomer(id, name, phone, duration) {
       const eh = Math.floor(endMin / 60);
       const em = endMin % 60;
       document.getElementById('resEnd').value = `${eh}:${String(em).padStart(2, '0')}`;
-      // アフターケア終了 = 開始 + 90分（90分枠ベース）
-      const acMin = startMin + 90;
+      // アフターケア終了 = 施術終了 + 残り時間（最大30分）
+      const acDuration = Math.min(90 - duration, 30);
+      const acMin = endMin + (acDuration > 0 ? acDuration : 0);
       const ach = Math.floor(acMin / 60);
       const acm = acMin % 60;
       document.getElementById('resAftercareEnd').value = `${ach}:${String(acm).padStart(2, '0')}`;
