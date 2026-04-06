@@ -850,6 +850,7 @@ body {
 <script>
 // ── PIN認証 ──
 const APP_PIN = '3141';
+const PIN_KEY = 'pin_yoyaku'; // アプリごとに別キー
 let pinValue = '';
 function pinInput(n) {
   if (pinValue.length >= 4) return;
@@ -859,7 +860,7 @@ function pinInput(n) {
   if (pinValue.length === 4) {
     setTimeout(() => {
       if (pinValue === APP_PIN) {
-        localStorage.setItem('pin_auth', 'ok');
+        localStorage.setItem(PIN_KEY, APP_PIN);
         document.getElementById('pin-screen').classList.add('hidden');
       } else {
         document.getElementById('pin-error').textContent = 'PINが違います';
@@ -875,7 +876,7 @@ function pinDelete() {
     for (let i = 0; i < 4; i++) document.getElementById('pd' + i).classList.toggle('filled', i < pinValue.length);
   }
 }
-if (localStorage.getItem('pin_auth') === 'ok') {
+if (localStorage.getItem(PIN_KEY) === APP_PIN) {
   document.getElementById('pin-screen').classList.add('hidden');
 }
 
