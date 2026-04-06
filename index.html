@@ -979,6 +979,7 @@ async function syncConfigFromApi() {
 }
 
 let dayKarteStatusMap = {}; // customer_id → karte status for current date
+let dayCustomerInfoMap = {}; // customer_id → {birthday, is_new, membership_plan}
 
 async function syncDayDataFromApi() {
   const dk = dateKey(currentDate);
@@ -1014,6 +1015,13 @@ async function syncDayDataFromApi() {
       const allRes = lsLoad('reservations', {});
       allRes[dk] = dayReservations;
       lsSave('reservations', allRes);
+      // 顧客情報取得（誕生月バッジ用）
+      const cids = dayReservations.filter(r => r.customerId).map(r => r.customerId);
+      dayCustomerInfoMap = {};
+      if (cids.length > 0) {
+        const custs = await sbGet('customers', `id=in.(${[...new Set(cids)].join(',')})&select=id,birthday,is_new,membership_plan`);
+        if (custs) custs.forEach(c => { dayCustomerInfoMap[c.id] = c; });
+      }
     }
     if (stateData) {
       dayCheckStates = {};
@@ -1469,10 +1477,12 @@ function renderGrid() {
       } else {
         html += `<span class="res-time-label">${res.start}〜</span>`;
         if (type !== 'break' && type !== 'task' && type !== 'block') {
+          const ci = res.customerId ? dayCustomerInfoMap[res.customerId] : null;
+          const bdMark = (ci && ci.birthday && new Date(ci.birthday).getMonth() + 1 === new Date().getMonth() + 1) ? ' 🎉' : '';
           if (noStaff) {
-            html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}</span>`;
+            html += `<span class="res-name no-staff-warn">⚠ 未定 ${res.name}${bdMark}</span>`;
           } else {
-            html += `<span class="res-name">${res.name}</span>`;
+            html += `<span class="res-name">${res.name}${bdMark}</span>`;
           }
         }
       }
@@ -1792,6 +1802,13 @@ function openViewModal(res) {
   html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">`;
   html += `<span style="font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-glow);padding:3px 8px;border-radius:6px">${typeLabels[type]}</span>`;
   if (res.checkedIn) html += `<span style="font-size:12px;font-weight:800;color:var(--success);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:6px">✓ 来店済み</span>`;
+  // 誕生月
+  if (res.customerId) {
+    const ci = dayCustomerInfoMap[res.customerId];
+    if (ci && ci.birthday && new Date(ci.birthday).getMonth() + 1 === new Date().getMonth() + 1) {
+      html += `<span style="font-size:12px;font-weight:800;color:#C2185B;background:#FCE4EC;padding:3px 8px;border-radius:6px">誕生月🎉</span>`;
+    }
+  }
   // カルテステータス
   if (type === 'treatment' && res.customerId) {
     const ks = dayKarteStatusMap[res.customerId];
