@@ -335,6 +335,7 @@ body {
   cursor: pointer; z-index: 3; overflow: hidden;
   display: flex; flex-direction: column; justify-content: center;
   transition: transform .1s;
+  touch-action: none;
 }
 .reservation:active { transform: scale(0.98); }
 /* 種別スタイル */
@@ -419,6 +420,9 @@ body {
 .res-ks-none { background: rgba(192,57,43,0.2); color: #C0392B; }
 .res-ks-draft { background: rgba(230,126,34,0.2); color: #E67E22; }
 .res-ks-done { background: rgba(39,174,96,0.2); color: #27AE60; }
+/* ドラッグ中 */
+.reservation.dragging { opacity: 0.85; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.3); transform: scale(1.03); pointer-events: none; }
+.drag-ghost { position: absolute; z-index: 99; border: 2px dashed var(--accent); border-radius: 5px; background: rgba(196,169,125,0.1); pointer-events: none; }
 /* アフターケア線（time-cells上に直接配置） */
 .aftercare-line {
   position: absolute; bottom: 4px;
@@ -1611,24 +1615,193 @@ function renderGrid() {
   html += '</div>';
   wrapper.innerHTML = '<div class="grid-scroll">' + html + '</div>';
 
-  // Events: 空白タップで新規追加
+  // Events: 空白タップで新規追加 + ドラッグ移動
+  const tMin = totalH * 60;
+  let dragState = null; // { res, el, startX, startY, origLeft, origWidth, roomId, tcRect, moved }
+
   wrapper.querySelectorAll('.time-cells').forEach(tc => {
-    // 長押しで休憩・練習の編集
     let longPressTimer = null;
     let longPressed = false;
+    let dragReady = false;
+
     tc.addEventListener('pointerdown', function(e) {
       const resEl = e.target.closest('[data-id]');
       if (!resEl) return;
       const res = dayReservations.find(r => r.id === resEl.dataset.id);
-      if (!res || (res.type !== 'break' && res.type !== 'practice')) return;
+      if (!res) return;
+
       longPressed = false;
-      longPressTimer = setTimeout(() => {
-        longPressed = true;
-        openViewModal(res);
-      }, 500);
+      dragReady = false;
+
+      // 施術タイプ: 長押しでドラッグモード
+      if (res.type === 'treatment' || res.type === 'shopping') {
+        longPressTimer = setTimeout(() => {
+          dragReady = true;
+          longPressed = true;
+          // ドラッグ開始
+          const tcRect = tc.getBoundingClientRect();
+          resEl.classList.add('dragging');
+          resEl.style.transition = 'none';
+          dragState = {
+            res, el: resEl, startX: e.clientX, startY: e.clientY,
+            origLeft: parseFloat(resEl.style.left),
+            origWidth: parseFloat(resEl.style.width),
+            roomId: tc.dataset.room,
+            origRoomId: tc.dataset.room,
+            tcRect, moved: false
+          };
+          // ゴースト（元の位置表示）
+          const ghost = document.createElement('div');
+          ghost.className = 'drag-ghost';
+          ghost.style.left = resEl.style.left;
+          ghost.style.width = resEl.style.width;
+          ghost.style.top = '2px';
+          ghost.style.bottom = '2px';
+          ghost.id = 'drag-ghost';
+          tc.appendChild(ghost);
+          tc.setPointerCapture(e.pointerId);
+        }, 400);
+      } else {
+        // 休憩・練習: 従来の長押し編集
+        longPressTimer = setTimeout(() => {
+          longPressed = true;
+          openViewModal(res);
+        }, 500);
+      }
     });
-    tc.addEventListener('pointerup', () => { clearTimeout(longPressTimer); });
-    tc.addEventListener('pointercancel', () => { clearTimeout(longPressTimer); });
+
+    tc.addEventListener('pointermove', function(e) {
+      if (!dragState) return;
+      e.preventDefault();
+      dragState.moved = true;
+
+      // 横移動（時間変更）
+      const dx = e.clientX - dragState.startX;
+      const dPct = (dx / dragState.tcRect.width) * 100;
+      let newLeft = dragState.origLeft + dPct;
+      // 15分スナップ
+      const snapPct = (15 / tMin) * 100;
+      newLeft = Math.round(newLeft / snapPct) * snapPct;
+      newLeft = Math.max(0, Math.min(newLeft, 100 - dragState.origWidth));
+      dragState.el.style.left = newLeft + '%';
+
+      // 縦移動（部屋変更）
+      const allTcs = wrapper.querySelectorAll('.time-cells');
+      allTcs.forEach(otherTc => {
+        const otherRect = otherTc.getBoundingClientRect();
+        if (e.clientY >= otherRect.top && e.clientY <= otherRect.bottom && otherTc.dataset.room !== dragState.roomId) {
+          // 別の部屋に移動
+          const ghost = document.getElementById('drag-ghost');
+          if (ghost) ghost.remove();
+          // 元の部屋から削除して新しい部屋に追加
+          if (dragState.el.parentElement !== otherTc) {
+            dragState.el.remove();
+            otherTc.appendChild(dragState.el);
+            // ゴーストを新しい部屋ではなく元の部屋に残す（元位置の目印）
+          }
+          dragState.roomId = otherTc.dataset.room;
+          dragState.tcRect = otherRect;
+        }
+      });
+    });
+
+    tc.addEventListener('pointerup', function(e) {
+      clearTimeout(longPressTimer);
+      if (dragState && dragState.moved) {
+        const ds = dragState;
+        const el = ds.el;
+        el.classList.remove('dragging');
+        el.style.transition = '';
+
+        // ゴースト削除
+        const ghost = document.getElementById('drag-ghost');
+        if (ghost) ghost.remove();
+
+        // 新しい時間を計算
+        const newLeftPct = parseFloat(el.style.left);
+        const newStartMin = Math.round(newLeftPct / 100 * tMin);
+        const [osh, osm] = ds.res.start.split(':').map(Number);
+        const [oeh, oem] = ds.res.end.split(':').map(Number);
+        const duration = (oeh * 60 + oem) - (osh * 60 + osm);
+        const newStartH = bh.start + Math.floor(newStartMin / 60);
+        const newStartM = newStartMin % 60;
+        const newEndMin = newStartMin + duration;
+        const newEndH = bh.start + Math.floor(newEndMin / 60);
+        const newEndM = newEndMin % 60;
+        const newStart = `${newStartH}:${String(newStartM).padStart(2,'0')}`;
+        const newEnd = `${newEndH}:${String(newEndM).padStart(2,'0')}`;
+        const newRoomId = ds.roomId;
+        const roomChanged = newRoomId !== ds.origRoomId;
+        const timeChanged = newStart !== ds.res.start;
+
+        if (!timeChanged && !roomChanged) {
+          // 移動なし → 元に戻す
+          dragState = null;
+          renderGrid();
+          return;
+        }
+
+        // 確認モーダル
+        const oldRoom = rooms.find(r => r.id === ds.origRoomId);
+        const newRoom = rooms.find(r => r.id === newRoomId);
+        let msg = `${ds.res.name}の予約を移動しますか？\n\n`;
+        if (timeChanged) msg += `時間: ${ds.res.start}〜${ds.res.end} → ${newStart}〜${newEnd}\n`;
+        if (roomChanged) msg += `部屋: ${oldRoom?.name||'?'} → ${newRoom?.name||'?'}`;
+
+        dragState = null;
+
+        if (confirm(msg)) {
+          // 更新
+          ds.res.start = newStart;
+          ds.res.end = newEnd;
+          ds.res.roomId = newRoomId;
+          // AC時間も連動
+          if (ds.res.aftercareEnd) {
+            const acDur = (() => {
+              const [ah, am] = ds.res.aftercareEnd.split(':').map(Number);
+              return (ah * 60 + am) - (oeh * 60 + oem);
+            })();
+            const acMin = newEndMin + (bh.start * 60) + acDur;
+            ds.res.aftercareEnd = `${Math.floor(acMin / 60)}:${String(acMin % 60).padStart(2,'0')}`;
+          }
+          renderGrid();
+          // Supabase保存
+          sbUpsert('yoyaku_reservations', {
+            id: ds.res.id, start_time: newStart, end_time: newEnd,
+            room_id: newRoomId, aftercare_end: ds.res.aftercareEnd || null,
+            updated_at: new Date().toISOString()
+          });
+          const allRes = lsLoad('reservations', {});
+          allRes[dateKey(currentDate)] = dayReservations;
+          lsSave('reservations', allRes);
+          showSync(true);
+        } else {
+          renderGrid();
+        }
+      } else if (dragState) {
+        // ドラッグモード入ったが動かなかった → 詳細モーダル表示
+        const ghost = document.getElementById('drag-ghost');
+        if (ghost) ghost.remove();
+        dragState.el.classList.remove('dragging');
+        dragState.el.style.transition = '';
+        const res = dragState.res;
+        dragState = null;
+        renderGrid();
+        openViewModal(res);
+      } else {
+        dragState = null;
+      }
+    });
+    tc.addEventListener('pointercancel', () => {
+      clearTimeout(longPressTimer);
+      if (dragState) {
+        const ghost = document.getElementById('drag-ghost');
+        if (ghost) ghost.remove();
+        dragState.el.classList.remove('dragging');
+        dragState = null;
+        renderGrid();
+      }
+    });
 
     tc.onclick = function(e) {
       if (longPressed) { longPressed = false; return; }
@@ -2645,6 +2818,7 @@ let touchStartX = 0;
 document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
 document.addEventListener('touchend', e => {
   if (document.querySelector('.modal-overlay.active')) return;
+  if (document.querySelector('.reservation.dragging')) return; // ドラッグ中はスワイプ無効
   const diff = e.changedTouches[0].clientX - touchStartX;
   if (Math.abs(diff) > 80) changeDate(diff > 0 ? -1 : 1);
 }, { passive: true });
