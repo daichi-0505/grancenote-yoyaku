@@ -1019,7 +1019,7 @@ async function syncDayDataFromApi() {
       const cids = dayReservations.filter(r => r.customerId).map(r => r.customerId);
       dayCustomerInfoMap = {};
       if (cids.length > 0) {
-        const custs = await sbGet('customers', `id=in.(${[...new Set(cids)].join(',')})&select=id,birthday,is_new,membership_plan`);
+        const custs = await sbGet('customers', `id=in.(${[...new Set(cids)].join(',')})&select=id,birthday,is_new,membership_plan,default_duration`);
         if (custs) custs.forEach(c => { dayCustomerInfoMap[c.id] = c; });
       }
     }
@@ -1802,11 +1802,14 @@ function openViewModal(res) {
   html += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">`;
   html += `<span style="font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-glow);padding:3px 8px;border-radius:6px">${typeLabels[type]}</span>`;
   if (res.checkedIn) html += `<span style="font-size:12px;font-weight:800;color:var(--success);background:rgba(16,185,129,0.1);padding:3px 8px;border-radius:6px">✓ 来店済み</span>`;
-  // 誕生月
+  // 誕生月 + 施術時間
   if (res.customerId) {
     const ci = dayCustomerInfoMap[res.customerId];
     if (ci && ci.birthday && new Date(ci.birthday).getMonth() + 1 === new Date().getMonth() + 1) {
       html += `<span style="font-size:12px;font-weight:800;color:#C2185B;background:#FCE4EC;padding:3px 8px;border-radius:6px">誕生月🎉</span>`;
+    }
+    if (ci && ci.default_duration) {
+      html += `<span style="font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-glow);padding:3px 8px;border-radius:6px">施術${ci.default_duration}分</span>`;
     }
   }
   // カルテステータス
@@ -2795,10 +2798,10 @@ document.getElementById('resName').addEventListener('input', function() {
   document.getElementById('karteLink').style.display = 'none';
   if (q.length < 1) { suggest.style.display = 'none'; return; }
   customerSearchTimeout = setTimeout(async () => {
-    const results = await sbGet('customers', `or=(name.ilike.*${encodeURIComponent(q)}*,name_kana.ilike.*${encodeURIComponent(q)}*,phone.ilike.*${encodeURIComponent(q)}*)&order=name&limit=8`);
+    const results = await sbGet('customers', `or=(name.ilike.*${encodeURIComponent(q)}*,name_kana.ilike.*${encodeURIComponent(q)}*,phone.ilike.*${encodeURIComponent(q)}*)&select=id,name,phone,default_duration,membership_plan&order=name&limit=8`);
     if (results.length === 0) { suggest.style.display = 'none'; return; }
     suggest.innerHTML = results.map(c =>
-      `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:13px;" onmousedown="selectCustomer('${c.id}','${c.name.replace(/'/g,"\\'")}','${c.phone||""}')">${c.name}<span style="color:#999;margin-left:8px;font-size:11px;">${c.phone||''}</span></div>`
+      `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #eee;font-size:13px;" onmousedown="selectCustomer('${c.id}','${c.name.replace(/'/g,"\\'")}','${c.phone||""}',${c.default_duration||60})">${c.name}<span style="color:#999;margin-left:8px;font-size:11px;">${c.membership_plan ? c.membership_plan+' ' : ''}${c.default_duration||60}分${c.phone ? ' / '+c.phone : ''}</span></div>`
     ).join('');
     suggest.style.display = 'block';
   }, 300);
@@ -2807,12 +2810,23 @@ document.getElementById('resName').addEventListener('blur', function() {
   setTimeout(() => { document.getElementById('customerSuggest').style.display = 'none'; }, 200);
 });
 
-function selectCustomer(id, name, phone) {
+function selectCustomer(id, name, phone, duration) {
   document.getElementById('resName').value = name;
   document.getElementById('resCustomerId').value = id;
   document.getElementById('customerSuggest').style.display = 'none';
   document.getElementById('karteLinkUrl').href = KARTE_APP_URL + '?customer_id=' + id;
   document.getElementById('karteLink').style.display = 'block';
+  // 施術時間で終了時間を自動計算
+  if (duration) {
+    const startVal = document.getElementById('resStart').value;
+    if (startVal) {
+      const [sh, sm] = startVal.split(':').map(Number);
+      const totalMin = sh * 60 + sm + duration;
+      const eh = Math.floor(totalMin / 60);
+      const em = totalMin % 60;
+      document.getElementById('resEnd').value = `${eh}:${String(em).padStart(2, '0')}`;
+    }
+  }
 }
 
 // ── 初期化 ──
