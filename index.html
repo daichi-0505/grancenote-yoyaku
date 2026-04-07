@@ -1568,7 +1568,10 @@ function renderGrid() {
         html += `<span class="res-type-tag">練習</span>`;
         if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       } else {
-        html += `<span class="res-time-label">${res.start}〜</span>`;
+        const [_sh,_sm] = res.start.split(':').map(Number);
+        const [_eh,_em] = res.end.split(':').map(Number);
+        const _dur = (_eh*60+_em) - (_sh*60+_sm);
+        html += `<span class="res-time-label">${res.start}〜 <span style="opacity:0.75;font-size:9px;font-weight:700;">${_dur}分</span></span>`;
         if (type !== 'break' && type !== 'task' && type !== 'block') {
           const ci = res.customerId ? dayCustomerInfoMap[res.customerId] : null;
           const bdMark = (ci && ci.birthday && new Date(ci.birthday).getMonth() + 1 === new Date().getMonth() + 1) ? ' 🎉' : '';
