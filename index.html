@@ -2656,6 +2656,7 @@ async function saveReservation() {
     practiceStaffIds: practiceStaffIds,
     blockRoomIds: blockRoomIds,
     blockStaffIds: blockStaffIds,
+    customerId: document.getElementById('resCustomerId').value || null,
   };
 
   // ブロックチェック（施術・買い物をブロック時間帯に入れようとしたら警告）
