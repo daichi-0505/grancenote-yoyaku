@@ -1597,11 +1597,11 @@ function renderGrid() {
         html += `<span class="res-type-tag">${typeLabels[type]}</span>`;
       }
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
-      if (type === 'treatment') {
-        const [__sh,__sm] = res.start.split(':').map(Number);
-        const [__eh,__em] = res.end.split(':').map(Number);
-        const __dur = (__eh*60+__em) - (__sh*60+__sm);
-        html += `<span class="res-menu-label res-duration-label">${__dur}分</span>`;
+      if (type === 'treatment' && res.customerId) {
+        const _ci = dayCustomerInfoMap[res.customerId];
+        if (_ci && _ci.default_duration) {
+          html += `<span class="res-menu-label res-duration-label">${_ci.default_duration}分</span>`;
+        }
       }
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
