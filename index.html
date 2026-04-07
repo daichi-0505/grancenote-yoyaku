@@ -440,6 +440,8 @@ body {
   background: rgba(0,0,0,0.15); padding: 0 3px; border-radius: 2px;
   line-height: 1.3; white-space: nowrap;
 }
+.res-duration-label { display: none; }
+@media (min-width: 768px) { .res-duration-label { display: inline; } }
 .res-memo-tag {
   font-size: 9px; font-weight: 700; color: rgba(0,0,0,0.5);
   background: rgba(255,255,255,0.5); padding: 0 3px; border-radius: 3px;
@@ -1568,10 +1570,7 @@ function renderGrid() {
         html += `<span class="res-type-tag">練習</span>`;
         if (res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
       } else {
-        const [_sh,_sm] = res.start.split(':').map(Number);
-        const [_eh,_em] = res.end.split(':').map(Number);
-        const _dur = (_eh*60+_em) - (_sh*60+_sm);
-        html += `<span class="res-time-label">${res.start}〜 <span style="opacity:0.75;font-size:9px;font-weight:700;">${_dur}分</span></span>`;
+        html += `<span class="res-time-label">${res.start}〜</span>`;
         if (type !== 'break' && type !== 'task' && type !== 'block') {
           const ci = res.customerId ? dayCustomerInfoMap[res.customerId] : null;
           const bdMark = (ci && ci.birthday && new Date(ci.birthday).getMonth() + 1 === new Date().getMonth() + 1) ? ' 🎉' : '';
@@ -1598,6 +1597,12 @@ function renderGrid() {
         html += `<span class="res-type-tag">${typeLabels[type]}</span>`;
       }
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
+      if (type === 'treatment') {
+        const [__sh,__sm] = res.start.split(':').map(Number);
+        const [__eh,__em] = res.end.split(':').map(Number);
+        const __dur = (__eh*60+__em) - (__sh*60+__sm);
+        html += `<span class="res-menu-label res-duration-label">${__dur}分</span>`;
+      }
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
       // カルテステータスバッジ（施術のみ、顧客紐付あり）
