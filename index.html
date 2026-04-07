@@ -355,16 +355,25 @@ body {
   border-color: #999 !important;
   box-shadow: none;
 }
-/* 誕生月ネオングロー */
-@keyframes birthday-neon {
-  0%, 100% { box-shadow: 0 0 4px rgba(255,185,50,0.4), 0 0 12px rgba(255,185,50,0.2); }
-  50% { box-shadow: 0 0 8px rgba(255,185,50,0.8), 0 0 20px rgba(255,185,50,0.4), 0 0 30px rgba(255,185,50,0.15); }
+/* 誕生月キラキラパルス */
+@keyframes birthday-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 0; }
 }
 .reservation.birthday-glow {
-  animation: birthday-neon 2s ease-in-out infinite;
   border-color: #FFB932 !important;
+  position: relative;
 }
-.reservation.birthday-glow.checked-in { animation: none; }
+.reservation.birthday-glow::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 7px;
+  border: 2px solid rgba(255,185,50,0.7);
+  animation: birthday-pulse 2s ease-out infinite;
+  pointer-events: none;
+}
+.reservation.birthday-glow.checked-in::after { animation: none; display: none; }
 .reservation.type-break {
   border: none; border-bottom: 4px dashed var(--res-color, #888);
   background: rgba(255,255,255,0.5);
