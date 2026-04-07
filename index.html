@@ -355,6 +355,16 @@ body {
   border-color: #999 !important;
   box-shadow: none;
 }
+/* 誕生月ネオングロー */
+@keyframes birthday-neon {
+  0%, 100% { box-shadow: 0 0 4px rgba(255,185,50,0.4), 0 0 12px rgba(255,185,50,0.2); }
+  50% { box-shadow: 0 0 8px rgba(255,185,50,0.8), 0 0 20px rgba(255,185,50,0.4), 0 0 30px rgba(255,185,50,0.15); }
+}
+.reservation.birthday-glow {
+  animation: birthday-neon 2s ease-in-out infinite;
+  border-color: #FFB932 !important;
+}
+.reservation.birthday-glow.checked-in { animation: none; }
 .reservation.type-break {
   border: none; border-bottom: 4px dashed var(--res-color, #888);
   background: rgba(255,255,255,0.5);
@@ -1514,6 +1524,11 @@ function renderGrid() {
       if (isChecked) cls += ' checked-in';
       if (noStaff) cls += ' no-staff';
       if (ol.total > 1) cls += ` overlap-${ol.index}`;
+      // 誕生月グロー
+      if (type === 'treatment' && res.customerId) {
+        const _bci = dayCustomerInfoMap[res.customerId];
+        if (_bci && _bci.birthday && new Date(_bci.birthday).getMonth() + 1 === new Date().getMonth() + 1) cls += ' birthday-glow';
+      }
 
       // CSS変数でスタッフ色を渡す
       const colorBg = color + '25'; // 15% alpha
