@@ -2165,10 +2165,10 @@ async function quickCheckIn(resId) {
   const allRes = lsLoad('reservations', {});
   allRes[dateKey(currentDate)] = dayReservations;
   lsSave('reservations', allRes);
-  // Supabase
-  sbUpsert('yoyaku_reservations', { id: resId, checked_in: true, updated_at: new Date().toISOString() });
   closeModal('viewModal');
   renderGrid();
+  // Supabase（awaitして確実に保存）
+  await sbUpsert('yoyaku_reservations', { id: resId, checked_in: true, updated_at: new Date().toISOString() });
 }
 
 // ── 空き枠検索 ──
