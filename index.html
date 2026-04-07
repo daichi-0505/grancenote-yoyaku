@@ -2167,8 +2167,14 @@ async function quickCheckIn(resId) {
   lsSave('reservations', allRes);
   closeModal('viewModal');
   renderGrid();
-  // Supabase（awaitして確実に保存）
-  await sbUpsert('yoyaku_reservations', { id: resId, checked_in: true, updated_at: new Date().toISOString() });
+  // Supabase — PATCHで部分更新（upsertだとNOT NULLカラム欠損でエラーになる）
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${resId}`, {
+      method: 'PATCH',
+      headers: { ...SB_HEADERS, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ checked_in: true, updated_at: new Date().toISOString() })
+    });
+  } catch(e) { console.error('CheckIn PATCH error:', e); }
 }
 
 // ── 空き枠検索 ──
