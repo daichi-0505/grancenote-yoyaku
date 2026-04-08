@@ -900,6 +900,8 @@ async function doLogin() {
     AUTH_TOKEN = data.access_token;
     localStorage.setItem(SESSION_KEY, JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 }));
     document.getElementById('login-screen').classList.add('hidden');
+    syncConfigFromApi();
+    syncDayDataFromApi();
   } catch (e) {
     errEl.textContent = '通信エラー';
   }
@@ -928,11 +930,7 @@ async function refreshSession() {
   } catch (e) { return false; }
 }
 
-(async () => {
-  if (await refreshSession()) {
-    document.getElementById('login-screen').classList.add('hidden');
-  }
-})();
+// セッション復元は init() から呼び出す
 
 // ── デフォルトデータ（API未接続時のフォールバック） ──
 const DEFAULT_STAFF = [
@@ -3169,17 +3167,23 @@ function selectCustomer(id, name, phone, duration) {
 // ── 初期化 ──
 function renderAll() { renderHeader(); renderStaffStatus(); renderShiftBars(); renderGrid(); }
 
-function init() {
+async function init() {
   setupLandscape();
+  // 0. セッション復元
+  if (await refreshSession()) {
+    document.getElementById('login-screen').classList.add('hidden');
+  }
   // 1. localStorageから即表示（0秒）
   loadConfigFromCache();
   loadDayDataFromCache();
   renderAll();
   document.getElementById('loadingOverlay').classList.add('hidden');
   requestAnimationFrame(() => { setTimeout(() => renderAll(), 50); });
-  // 2. バックグラウンドでAPIから最新データを取得→反映
-  syncConfigFromApi();
-  syncDayDataFromApi();
+  // 2. バックグラウンドでAPIから最新データを取得→反映（ログイン済みの場合のみ）
+  if (AUTH_TOKEN) {
+    syncConfigFromApi();
+    syncDayDataFromApi();
+  }
 }
 
 init();
