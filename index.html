@@ -931,6 +931,8 @@ async function refreshSession() {
 }
 
 // セッション復元は init() から呼び出す
+// 45分ごとにトークンを自動更新（有効期限1時間）
+setInterval(() => { if (AUTH_TOKEN) refreshSession(); }, 45 * 60 * 1000);
 
 // ── デフォルトデータ（API未接続時のフォールバック） ──
 const DEFAULT_STAFF = [
