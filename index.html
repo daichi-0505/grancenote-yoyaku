@@ -9,6 +9,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>予約帳 - グランセノーテ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root {
   --bg-primary:     #FFFFFF;
@@ -864,10 +865,16 @@ body {
 </div>
 
 <script>
-// ── Supabase API設定 ──
+// ── Supabase設定（公式ライブラリ使用） ──
 const SUPABASE_URL = 'https://lheojchyrxjlagxfbgjo.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_sV418nh9Akoc0EnxchRU4g_H2FFAa-4';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let AUTH_TOKEN = null;
+
+// トークン自動更新: ライブラリが自動でrefreshしてくれる
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  AUTH_TOKEN = session?.access_token || null;
+});
 
 function getSbHeaders(contentType) {
   const h = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + (AUTH_TOKEN || SUPABASE_KEY) };
@@ -879,8 +886,6 @@ function getSbHeadersFull() {
 }
 
 // ── ログイン認証 ──
-const SESSION_KEY = 'sb_session_yoyaku';
-
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pw = document.getElementById('login-password').value;
@@ -889,50 +894,19 @@ async function doLogin() {
   errEl.textContent = '';
   if (!email || !pw) { errEl.textContent = '入力してください'; return; }
   btn.disabled = true;
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: pw })
-    });
-    const data = await res.json();
-    if (!res.ok) { errEl.textContent = 'メールアドレスまたはパスワードが違います'; btn.disabled = false; return; }
-    AUTH_TOKEN = data.access_token;
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 }));
-    document.getElementById('login-screen').classList.add('hidden');
-    syncConfigFromApi();
-    syncDayDataFromApi();
-  } catch (e) {
-    errEl.textContent = '通信エラー';
-  }
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password: pw });
+  if (error) { errEl.textContent = 'メールアドレスまたはパスワードが違います'; btn.disabled = false; return; }
+  document.getElementById('login-screen').classList.add('hidden');
   btn.disabled = false;
+  syncConfigFromApi();
+  syncDayDataFromApi();
 }
 
 async function refreshSession() {
-  const stored = localStorage.getItem(SESSION_KEY);
-  if (!stored) return false;
-  const session = JSON.parse(stored);
-  if (Date.now() < session.expires_at - 60000) {
-    AUTH_TOKEN = session.access_token;
-    return true;
-  }
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: session.refresh_token })
-    });
-    if (!res.ok) { localStorage.removeItem(SESSION_KEY); return false; }
-    const data = await res.json();
-    AUTH_TOKEN = data.access_token;
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 }));
-    return true;
-  } catch (e) { return false; }
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) { AUTH_TOKEN = session.access_token; return true; }
+  return false;
 }
-
-// セッション復元は init() から呼び出す
-// 45分ごとにトークンを自動更新（有効期限1時間）
-setInterval(() => { if (AUTH_TOKEN) refreshSession(); }, 45 * 60 * 1000);
 
 // ── デフォルトデータ（API未接続時のフォールバック） ──
 const DEFAULT_STAFF = [
