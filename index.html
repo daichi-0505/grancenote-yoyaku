@@ -669,8 +669,8 @@ body {
     <div id="dragConfirmName" style="font-size:22px;font-weight:800;margin-bottom:16px;"></div>
     <div id="dragConfirmDetail" style="font-size:16px;color:var(--text-secondary);line-height:2;margin-bottom:24px;"></div>
     <div style="display:flex;gap:12px;">
-      <button class="btn btn-cancel" style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;" onclick="dragConfirmResult(false)">元に戻す</button>
-      <button class="btn btn-primary" style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;" onclick="dragConfirmResult(true)">確定</button>
+      <button class="btn btn-cancel" id="dragBtnCancel" style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;">元に戻す</button>
+      <button class="btn btn-primary" id="dragBtnOk" style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;">確定</button>
     </div>
   </div>
 </div>
@@ -1863,53 +1863,48 @@ function renderGrid() {
 }
 
 // ── ドラッグ確認 ──
+// onclick属性ではなくイベントリスナーで登録（iPad互換性）
+document.getElementById('dragBtnOk').addEventListener('pointerup', () => dragConfirmResult(true));
+document.getElementById('dragBtnCancel').addEventListener('pointerup', () => dragConfirmResult(false));
+
 async function dragConfirmResult(ok) {
   const modal = document.getElementById('dragConfirmModal');
+  const btnOk = document.getElementById('dragBtnOk');
+  const btnCancel = document.getElementById('dragBtnCancel');
+
   if (!ok || !pendingDragAction) {
     modal.classList.remove('active');
     renderGrid();
     pendingDragAction = null;
     return;
   }
+
   const { ds, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
-
-  // デバッグ: 何が起きているか可視化（問題解決後に削除）
-  const debugInfo = [`v46 DEBUG`, `id=${ds.res.id}`, `token=${AUTH_TOKEN ? 'あり' : 'なし'}`, `${newStart}→${newEnd}`];
-  alert(debugInfo.join('\n'));
-
-  const btnOk = modal.querySelector('.btn-primary');
-  const btnCancel = modal.querySelector('.btn-cancel');
   btnOk.textContent = '変更中...';
-  btnOk.disabled = true;
-  btnCancel.disabled = true;
+  btnCancel.style.display = 'none';
 
   let saved = false;
-  let errorMsg = '';
   try {
     savingInProgress = true;
     if (!AUTH_TOKEN) await refreshSession();
-    if (!AUTH_TOKEN) throw new Error('AUTH_TOKEN なし');
+    if (!AUTH_TOKEN) throw new Error('ログイン切れ');
     const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${ds.res.id}`, {
       method: 'PATCH',
       headers: { ...getSbHeadersFull(), 'Prefer': 'return=representation' },
       body: JSON.stringify({ start_time: newStart, end_time: newEnd, room_id: newRoomId, aftercare_end: newAC || null, updated_at: new Date().toISOString() })
     });
-    if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status} ${await patchRes.text()}`);
+    if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
     const updated = await patchRes.json();
-    if (!updated || updated.length === 0) throw new Error('0行更新（RLSブロック）');
+    if (!updated || updated.length === 0) throw new Error('保存失敗');
     saved = true;
-    errorMsg = `成功: ${updated.length}行更新`;
   } catch(e) {
-    errorMsg = `失敗: ${e.message}`;
-    console.error('Drag PATCH error:', e);
+    console.error('Drag error:', e);
+    alert('予約の移動に失敗しました: ' + e.message);
   } finally {
     savingInProgress = false;
     btnOk.textContent = '確定';
-    btnOk.disabled = false;
-    btnCancel.disabled = false;
+    btnCancel.style.display = '';
   }
-  // デバッグ: 結果表示（問題解決後に削除）
-  alert(`PATCH結果: ${errorMsg}`);
 
   if (saved) {
     ds.res.start = newStart;
@@ -1919,8 +1914,6 @@ async function dragConfirmResult(ok) {
     const allRes = lsLoad('reservations', {});
     allRes[dateKey(currentDate)] = dayReservations;
     lsSave('reservations', allRes);
-  } else {
-    alert('予約の移動に失敗しました。元の位置に戻します。');
   }
   modal.classList.remove('active');
   renderGrid();
