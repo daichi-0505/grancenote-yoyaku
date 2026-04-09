@@ -1093,9 +1093,11 @@ async function syncConfigFromApi() {
 
 let dayKarteStatusMap = {}; // customer_id → karte status for current date
 let dayCustomerInfoMap = {}; // customer_id → {birthday, is_new, membership_plan}
+let dragState = null;
+let pendingDragAction = null;
 
 async function syncDayDataFromApi() {
-  if (savingInProgress) return; // 保存中はsyncしない（古いデータで上書き防止）
+  if (savingInProgress || pendingDragAction || dragState) return; // 保存中・ドラッグ中はsyncしない
   const dk = dateKey(currentDate);
   try {
     const [resData, stateData, shiftData, karteData] = await Promise.all([
@@ -1665,8 +1667,7 @@ function renderGrid() {
 
   // Events: 空白タップで新規追加 + ドラッグ移動
   const tMin = totalH * 60;
-  let dragState = null;
-  let pendingDragAction = null; // {ds, newStart, newEnd, newRoomId} for confirm modal
+  // dragState, pendingDragAction はグローバルスコープで宣言済み
 
   wrapper.querySelectorAll('.time-cells').forEach(tc => {
     let longPressTimer = null;
@@ -1818,7 +1819,7 @@ function renderGrid() {
           newAC = `${Math.floor(acMin / 60)}:${String(acMin % 60).padStart(2,'0')}`;
         }
 
-        pendingDragAction = { ds, newStart, newEnd, newRoomId, newAC };
+        pendingDragAction = { resId: ds.res.id, newStart, newEnd, newRoomId, newAC };
         dragState = null;
       } else if (dragState) {
         // ドラッグモード入ったが動かなかった → 詳細モーダル表示
@@ -1865,10 +1866,41 @@ function renderGrid() {
 // ── ドラッグ確認 ──
 async function dragConfirmResult(ok) {
   document.getElementById('dragConfirmModal').classList.remove('active');
-  if (ok && pendingDragAction) {
-    const { ds, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
-    // IDで現在の配列から探して更新（sync後に参照が切れるため）
-    const target = dayReservations.find(r => r.id === ds.res.id);
+  if (!ok || !pendingDragAction) {
+    renderGrid();
+    pendingDragAction = null;
+    return;
+  }
+  const { resId, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
+
+  // 1. 認証チェック
+  if (!AUTH_TOKEN) await refreshSession();
+  if (!AUTH_TOKEN) {
+    alert('ログインが切れました。再ログインしてください。');
+    pendingDragAction = null;
+    renderGrid();
+    return;
+  }
+
+  // 2. DB保存（PATCHで部分更新、結果を確認）
+  savingInProgress = true;
+  let patchOk = false;
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${resId}`, {
+      method: 'PATCH',
+      headers: { ...getSbHeadersFull(), 'Prefer': 'return=representation' },
+      body: JSON.stringify({ start_time: newStart, end_time: newEnd, room_id: newRoomId, aftercare_end: newAC || null, updated_at: new Date().toISOString() })
+    });
+    if (resp.ok) {
+      const rows = await resp.json();
+      patchOk = Array.isArray(rows) && rows.length > 0;
+    }
+  } catch(e) { console.error('Drag PATCH error:', e); }
+  savingInProgress = false;
+
+  // 3. DB成功 → ローカルも更新、失敗 → 元に戻す
+  if (patchOk) {
+    const target = dayReservations.find(r => r.id === resId);
     if (target) {
       target.start = newStart;
       target.end = newEnd;
@@ -1878,20 +1910,10 @@ async function dragConfirmResult(ok) {
     const allRes = lsLoad('reservations', {});
     allRes[dateKey(currentDate)] = dayReservations;
     lsSave('reservations', allRes);
-    renderGrid();
-    // PATCH（部分更新）— sbUpsertだとNOT NULLカラム欠損で失敗する
-    savingInProgress = true;
-    try {
-      await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${ds.res.id}`, {
-        method: 'PATCH',
-        headers: { ...getSbHeadersFull(), 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ start_time: newStart, end_time: newEnd, room_id: newRoomId, aftercare_end: newAC || null, updated_at: new Date().toISOString() })
-      });
-    } catch(e) { console.error('Drag PATCH error:', e); }
-    savingInProgress = false;
   } else {
-    renderGrid();
+    alert('予約の移動に失敗しました。');
   }
+  renderGrid();
   pendingDragAction = null;
 }
 
@@ -2895,7 +2917,7 @@ document.getElementById('refreshBtn').addEventListener('click', async () => {
 });
 
 // Now line update
-setInterval(() => { if(dateKey(new Date())===dateKey(currentDate)) renderGrid(); }, 60000);
+setInterval(() => { if(dateKey(new Date())===dateKey(currentDate) && !dragState && !pendingDragAction) renderGrid(); }, 60000);
 // Auto refresh from server every 2 minutes
 setInterval(() => syncDayDataFromApi(), 120000);
 
