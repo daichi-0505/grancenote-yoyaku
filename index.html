@@ -1873,6 +1873,7 @@ async function dragConfirmResult(ok) {
 
 // ── Modals ──
 let editingRes = null;
+let endTimeManuallySet = false;
 let currentType = 'treatment';
 
 function setType(type) {
@@ -2073,11 +2074,13 @@ function openAddModal(roomId, hour, mins, bh) {
   document.getElementById('detailToggle').classList.remove('open');
   document.getElementById('detailSection').classList.remove('open');
   populateSubAssignments([]);
+  endTimeManuallySet = false;
   populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(roomId);
   document.getElementById('resStart').value = `${hour}:${String(mins).padStart(2,'0')}`;
   let eh = hour + 1, em = mins;
   if (eh > bh.end || (eh === bh.end && em > 0)) { eh = bh.end; em = 0; }
   document.getElementById('resEnd').value = `${eh}:${String(em).padStart(2,'0')}`;
+  document.getElementById('resEnd').onchange = () => { endTimeManuallySet = true; };
   document.getElementById('modalFooter').innerHTML = `
     <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
     <button class="btn btn-primary" onclick="saveReservation()">保存</button>`;
@@ -2553,9 +2556,11 @@ function openEditModal(res) {
   document.getElementById('resMenu').value = res.menu || '';
   document.getElementById('resMemo').value = res.memo || '';
   document.getElementById('resCheckedIn').checked = !!res.checkedIn;
+  endTimeManuallySet = true; // 編集時は既存の時間を優先
   populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(res.roomId);
   document.getElementById('resStart').value = res.start;
   document.getElementById('resEnd').value = res.end;
+  document.getElementById('resEnd').onchange = () => { endTimeManuallySet = true; };
   document.getElementById('resStaff').value = res.staffId || '';
   document.getElementById('resAftercareEnd').value = res.aftercareEnd || '';
   document.getElementById('resAftercareStaff').value = res.aftercareStaffId || '';
@@ -3129,8 +3134,8 @@ function selectCustomer(id, name, phone, duration) {
   document.getElementById('customerSuggest').style.display = 'none';
   document.getElementById('karteLinkUrl').href = KARTE_APP_URL + '?customer_id=' + id;
   document.getElementById('karteLink').style.display = 'block';
-  // 施術時間で終了時間を自動計算
-  if (duration) {
+  // 施術時間で終了時間を自動計算（スタッフが手動変更済みの場合はスキップ）
+  if (duration && !endTimeManuallySet) {
     const startVal = document.getElementById('resStart').value;
     if (startVal) {
       const [sh, sm] = startVal.split(':').map(Number);
