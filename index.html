@@ -1864,38 +1864,44 @@ function renderGrid() {
 
 // ── ドラッグ確認 ──
 async function dragConfirmResult(ok) {
+  const modal = document.getElementById('dragConfirmModal');
   if (!ok || !pendingDragAction) {
-    document.getElementById('dragConfirmModal').classList.remove('active');
+    modal.classList.remove('active');
     renderGrid();
     pendingDragAction = null;
     return;
   }
   const { ds, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
-  // ボタンを「変更中...」に変え、操作をブロック
-  const modal = document.getElementById('dragConfirmModal');
-  modal.querySelector('.btn-primary').textContent = '変更中...';
-  modal.querySelector('.btn-primary').disabled = true;
-  modal.querySelector('.btn-cancel').disabled = true;
+  const btnOk = modal.querySelector('.btn-primary');
+  const btnCancel = modal.querySelector('.btn-cancel');
+  btnOk.textContent = '変更中...';
+  btnOk.disabled = true;
+  btnCancel.disabled = true;
 
-  // 1. まずDBに保存（成功するまでUI更新しない）
-  savingInProgress = true;
   let saved = false;
-  if (await ensureAuth()) {
-    try {
-      const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${ds.res.id}`, {
-        method: 'PATCH',
-        headers: { ...getSbHeadersFull(), 'Prefer': 'return=representation' },
-        body: JSON.stringify({ start_time: newStart, end_time: newEnd, room_id: newRoomId, aftercare_end: newAC || null, updated_at: new Date().toISOString() })
-      });
-      if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
-      const updated = await patchRes.json();
-      if (!updated || updated.length === 0) throw new Error('保存が反映されませんでした');
-      saved = true;
-    } catch(e) { console.error('Drag PATCH error:', e); }
+  try {
+    savingInProgress = true;
+    if (!AUTH_TOKEN) await refreshSession();
+    if (!AUTH_TOKEN) throw new Error('ログイン切れ');
+    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${ds.res.id}`, {
+      method: 'PATCH',
+      headers: { ...getSbHeadersFull(), 'Prefer': 'return=representation' },
+      body: JSON.stringify({ start_time: newStart, end_time: newEnd, room_id: newRoomId, aftercare_end: newAC || null, updated_at: new Date().toISOString() })
+    });
+    if (!patchRes.ok) throw new Error(`HTTP ${patchRes.status}`);
+    const updated = await patchRes.json();
+    if (!updated || updated.length === 0) throw new Error('0行更新');
+    saved = true;
+  } catch(e) {
+    console.error('Drag PATCH error:', e);
+  } finally {
+    savingInProgress = false;
+    // 必ずボタンをリセット
+    btnOk.textContent = '確定';
+    btnOk.disabled = false;
+    btnCancel.disabled = false;
   }
-  savingInProgress = false;
 
-  // 2. DB保存成功 → UI反映 / 失敗 → 元に戻す
   if (saved) {
     ds.res.start = newStart;
     ds.res.end = newEnd;
@@ -1908,9 +1914,6 @@ async function dragConfirmResult(ok) {
     alert('予約の移動に失敗しました。元の位置に戻します。');
   }
   modal.classList.remove('active');
-  modal.querySelector('.btn-primary').textContent = '確定';
-  modal.querySelector('.btn-primary').disabled = false;
-  modal.querySelector('.btn-cancel').disabled = false;
   renderGrid();
   pendingDragAction = null;
 }
