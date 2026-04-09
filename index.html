@@ -908,6 +908,13 @@ async function refreshSession() {
   return false;
 }
 
+// 書き込み前にトークンを確認（RLSがauthenticatedのみ許可のため、anon keyだと204返るが0行更新になる）
+async function ensureAuth() {
+  if (!AUTH_TOKEN) await refreshSession();
+  if (!AUTH_TOKEN) { alert('ログインが切れました。再ログインしてください。'); return false; }
+  return true;
+}
+
 // iPadスリープ復帰時にトークンを更新（スリープ中はJSタイマーが止まり期限切れになる）
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible' && AUTH_TOKEN) {
@@ -1007,6 +1014,7 @@ async function sbPost(table, data) {
 }
 
 async function sbDelete(table, query) {
+  if (!await ensureAuth()) return false;
   showSync(true);
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
@@ -1019,6 +1027,7 @@ async function sbDelete(table, query) {
 }
 
 async function sbUpsert(table, data) {
+  if (!await ensureAuth()) return false;
   showSync(true);
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
@@ -1866,16 +1875,19 @@ async function dragConfirmResult(ok) {
     allRes[dateKey(currentDate)] = dayReservations;
     lsSave('reservations', allRes);
     renderGrid();
-    // PATCH（部分更新）で保存 — upsertだとNOT NULLカラム欠損で400エラーになる
+    // PATCH（部分更新）で保存
     savingInProgress = true;
+    if (!await ensureAuth()) { savingInProgress = false; return; }
     try {
       const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${ds.res.id}`, {
         method: 'PATCH',
-        headers: { ...getSbHeadersFull(), 'Prefer': 'return=minimal' },
+        headers: { ...getSbHeadersFull(), 'Prefer': 'return=representation' },
         body: JSON.stringify({ start_time: newStart, end_time: newEnd, room_id: newRoomId, aftercare_end: newAC || null, updated_at: new Date().toISOString() })
       });
       if (!patchRes.ok) throw new Error(`${patchRes.status}`);
-    } catch(e) { console.error('Drag PATCH error:', e); alert('予約の移動に失敗しました。電波状況を確認してください。'); }
+      const updated = await patchRes.json();
+      if (!updated || updated.length === 0) throw new Error('RLS blocked: 0 rows updated');
+    } catch(e) { console.error('Drag PATCH error:', e); alert('予約の移動の保存に失敗しました。ページを再読み込みしてください。'); }
     savingInProgress = false;
   } else {
     renderGrid();
@@ -2205,7 +2217,8 @@ async function quickCheckIn(resId) {
   lsSave('reservations', allRes);
   closeModal('viewModal');
   renderGrid();
-  // Supabase — PATCHで部分更新（upsertだとNOT NULLカラム欠損でエラーになる）
+  // Supabase — PATCHで部分更新
+  await ensureAuth();
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${resId}`, {
       method: 'PATCH',
