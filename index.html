@@ -908,6 +908,14 @@ async function refreshSession() {
   return false;
 }
 
+// iPadスリープ復帰時にトークンを更新（スリープ中はJSタイマーが止まり期限切れになる）
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && AUTH_TOKEN) {
+    await refreshSession();
+    syncDayDataFromApi();
+  }
+});
+
 // ── デフォルトデータ（API未接続時のフォールバック） ──
 const DEFAULT_STAFF = [
   { id: 's1', name: '峯 琴音', color: '#E53935' },
