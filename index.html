@@ -1867,11 +1867,16 @@ async function dragConfirmResult(ok) {
   document.getElementById('dragConfirmModal').classList.remove('active');
   if (ok && pendingDragAction) {
     const { ds, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
-    ds.res.start = newStart;
-    ds.res.end = newEnd;
-    ds.res.roomId = newRoomId;
-    if (newAC) ds.res.aftercareEnd = newAC;
-    const allRes = lsLoad('reservations', {});
+    // syncDayDataFromApiがdayReservationsを新配列に置換している可能性があるため、
+    // ds.res（旧参照）ではなくIDで現在の配列から探して更新する
+    const target = dayReservations.find(r => r.id === ds.res.id);
+    if (target) {
+      target.start = newStart;
+      target.end = newEnd;
+      target.roomId = newRoomId;
+      if (newAC) target.aftercareEnd = newAC;
+    }
+    const allRes = lsLoad('reservations', {})
     allRes[dateKey(currentDate)] = dayReservations;
     lsSave('reservations', allRes);
     renderGrid();
