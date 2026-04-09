@@ -1422,13 +1422,13 @@ function renderChecklist() {
     const lbl = document.createElement('label'); lbl.className = 'check-item';
     const cb = document.createElement('input'); cb.type = 'checkbox';
     cb.checked = !!dayCheckStates[c.id];
-    cb.addEventListener('change', () => {
+    cb.addEventListener('change', async () => {
       dayCheckStates[c.id] = cb.checked;
       const all = lsLoad('checkstates', {});
       if (!all[dateKey(currentDate)]) all[dateKey(currentDate)] = {};
       all[dateKey(currentDate)][c.id] = cb.checked;
       lsSave('checkstates', all);
-      sbUpsert('yoyaku_check_states', { date: dateKey(currentDate), check_id: c.id, checked: cb.checked });
+      await sbUpsert('yoyaku_check_states', { date: dateKey(currentDate), check_id: c.id, checked: cb.checked });
     });
     const sp = document.createElement('span'); sp.textContent = c.label;
     lbl.appendChild(cb); lbl.appendChild(sp); bar.appendChild(lbl);
@@ -1839,7 +1839,7 @@ function renderGrid() {
 }
 
 // ── ドラッグ確認 ──
-function dragConfirmResult(ok) {
+async function dragConfirmResult(ok) {
   document.getElementById('dragConfirmModal').classList.remove('active');
   if (ok && pendingDragAction) {
     const { ds, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
@@ -1847,16 +1847,16 @@ function dragConfirmResult(ok) {
     ds.res.end = newEnd;
     ds.res.roomId = newRoomId;
     if (newAC) ds.res.aftercareEnd = newAC;
+    const allRes = lsLoad('reservations', {});
+    allRes[dateKey(currentDate)] = dayReservations;
+    lsSave('reservations', allRes);
     renderGrid();
-    sbUpsert('yoyaku_reservations', {
+    const saved = await sbUpsert('yoyaku_reservations', {
       id: ds.res.id, start_time: newStart, end_time: newEnd,
       room_id: newRoomId, aftercare_end: newAC || null,
       updated_at: new Date().toISOString()
     });
-    const allRes = lsLoad('reservations', {});
-    allRes[dateKey(currentDate)] = dayReservations;
-    lsSave('reservations', allRes);
-    showSync(true);
+    if (!saved) alert('予約の移動に失敗しました。電波状況を確認してください。');
   } else {
     renderGrid();
   }
@@ -2675,15 +2675,14 @@ async function saveReservation() {
     dayReservations.push(data);
   }
 
-  closeModal('reservationModal');
-  renderGrid();
-
   // localStorageにキャッシュ保存（即表示用）
   const allRes = lsLoad('reservations', {});
   allRes[dateKey(currentDate)] = dayReservations;
   lsSave('reservations', allRes);
-  // Supabaseにも保存
-  sbUpsert('yoyaku_reservations', {
+  renderGrid();
+
+  // Supabaseに保存（完了を待つ）
+  const ok = await sbUpsert('yoyaku_reservations', {
     id: data.id, date: data.date, name: data.name, menu: data.menu,
     staff_id: data.staffId || null, start_time: data.start, end_time: data.end,
     room_id: data.roomId, memo: data.memo, type: data.type,
@@ -2696,6 +2695,8 @@ async function saveReservation() {
     customer_id: document.getElementById('resCustomerId').value || null,
     updated_at: new Date().toISOString()
   });
+  if (!ok) alert('予約の保存に失敗しました。電波状況を確認して再度お試しください。');
+  closeModal('reservationModal');
 }
 
 async function deleteReservation() {
@@ -2703,15 +2704,16 @@ async function deleteReservation() {
   if (!confirm(`${editingRes.name} の予約を削除しますか？`)) return;
   const id = editingRes.id;
   dayReservations = dayReservations.filter(r => r.id !== id);
-  closeModal('reservationModal');
-  renderGrid();
 
   // localStorageキャッシュ更新
   const allRes = lsLoad('reservations', {});
   allRes[dateKey(currentDate)] = dayReservations;
   lsSave('reservations', allRes);
-  // Supabaseからも削除
-  sbDelete('yoyaku_reservations', `id=eq.${id}`);
+  renderGrid();
+  // Supabaseからも削除（完了を待つ）
+  const ok = await sbDelete('yoyaku_reservations', `id=eq.${id}`);
+  if (!ok) alert('予約の削除に失敗しました。電波状況を確認して再度お試しください。');
+  closeModal('reservationModal');
 }
 
 // ── Settings ──
@@ -2773,17 +2775,17 @@ function renderChecklistSettings() {
 async function saveStaffConfig() {
   lsSave('staff', staff);
   const list = staff.map((s,i) => ({ id: s.id, name: s.name, color: s.color, sort_order: i }));
-  sbUpsert('yoyaku_staff', list);
+  await sbUpsert('yoyaku_staff', list);
 }
 async function saveRoomConfig() {
   lsSave('rooms', rooms);
   const list = rooms.map((r,i) => ({ id: r.id, name: r.name, sub: r.sub || '', divider: !!r.divider, sort_order: i }));
-  sbUpsert('yoyaku_rooms', list);
+  await sbUpsert('yoyaku_rooms', list);
 }
 async function saveCheckConfig() {
   lsSave('checks', checks);
   const list = checks.map((c,i) => ({ id: c.id, label: c.label, sort_order: i }));
-  sbUpsert('yoyaku_checks', list);
+  await sbUpsert('yoyaku_checks', list);
 }
 
 // ── イベント ──
