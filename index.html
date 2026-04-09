@@ -1876,6 +1876,7 @@ async function dragConfirmResult(ok) {
     lsSave('reservations', allRes);
     renderGrid();
     // PATCH（部分更新）— sbUpsertだとNOT NULLカラム欠損で失敗する
+    savingInProgress = true;
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/yoyaku_reservations?id=eq.${ds.res.id}`, {
         method: 'PATCH',
@@ -1883,6 +1884,7 @@ async function dragConfirmResult(ok) {
         body: JSON.stringify({ start_time: newStart, end_time: newEnd, room_id: newRoomId, aftercare_end: newAC || null, updated_at: new Date().toISOString() })
       });
     } catch(e) { console.error('Drag PATCH error:', e); }
+    savingInProgress = false;
   } else {
     renderGrid();
   }
