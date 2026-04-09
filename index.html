@@ -660,7 +660,6 @@ body {
   <div class="loading-text">読み込み中...</div>
 </div>
 <div class="sync-indicator" id="syncIndicator"></div>
-<div id="debugVersion" style="position:fixed;bottom:4px;right:4px;font-size:10px;color:#999;z-index:99999;">v52</div>
 <div class="offline-banner" id="offlineBanner">オフライン - データの保存ができません</div>
 
 <!-- ドラッグ移動確認モーダル -->
@@ -1870,8 +1869,6 @@ async function dragConfirmResult(ok) {
     const { ds, newStart, newEnd, newRoomId, newAC } = pendingDragAction;
     // IDで現在の配列から探して更新（sync後に参照が切れるため）
     const target = dayReservations.find(r => r.id === ds.res.id);
-    // デバッグ（問題解決後に削除）
-    alert(`v52確認\nid=${ds.res.id}\ntarget=${target ? '見つかった' : 'なし'}\n${ds.res.start}→${newStart}`);
     if (target) {
       target.start = newStart;
       target.end = newEnd;
