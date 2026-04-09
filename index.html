@@ -2191,8 +2191,11 @@ function openViewModal(res) {
     if (ci && ci.birthday && new Date(ci.birthday).getMonth() + 1 === new Date().getMonth() + 1) {
       html += `<span style="font-size:12px;font-weight:800;color:#C2185B;background:#FCE4EC;padding:3px 8px;border-radius:6px">誕生月🎉</span>`;
     }
-    if (ci && ci.default_duration) {
-      html += `<span style="font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-glow);padding:3px 8px;border-radius:6px">施術${ci.default_duration}分</span>`;
+    const [_vsh,_vsm] = res.start.split(':').map(Number);
+    const [_veh,_vem] = res.end.split(':').map(Number);
+    const _vdur = (_veh*60+_vem) - (_vsh*60+_vsm);
+    if (_vdur > 0) {
+      html += `<span style="font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-glow);padding:3px 8px;border-radius:6px">施術${_vdur}分</span>`;
     }
   }
   // カルテステータス
