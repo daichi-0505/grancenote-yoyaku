@@ -1157,7 +1157,7 @@ function getBH(date) {
 function getTimeOpts(bh) {
   const o = [];
   for (let h = bh.start; h <= bh.end; h++)
-    for (let m = 0; m < 60; m += 10) { if (h === bh.end && m > 0) break; o.push(`${h}:${String(m).padStart(2,'0')}`); }
+    for (let m = 0; m < 60; m += 5) { if (h === bh.end && m > 0) break; o.push(`${h}:${String(m).padStart(2,'0')}`); }
   return o;
 }
 
@@ -1490,13 +1490,13 @@ function renderGrid() {
     html += `<div class="room-label" style="width:${labelW}px">${room.name}${room.sub ? '<span class="room-sublabel">'+room.sub+'</span>' : ''}</div>`;
     html += `<div class="time-cells" data-room="${room.id}">`;
 
-    const totalQ = totalH * 6;
+    const totalQ = totalH * 4;
     for (let q = 0; q <= totalQ; q++) {
       const pct = q / totalQ * 100;
       let cls = 'grid-line';
       if (q === totalQ) cls += ' end';
-      else if (q % 6 === 0) cls += ' hour';
-      else if (q % 3 === 0) cls += ' half';
+      else if (q % 4 === 0) cls += ' hour';
+      else if (q % 2 === 0) cls += ' half';
       else cls += ' quarter';
       html += `<div class="${cls}" style="left:${pct}%"></div>`;
     }
@@ -1718,8 +1718,8 @@ function renderGrid() {
       const dx = e.clientX - dragState.startX;
       const dPct = (dx / dragState.tcRect.width) * 100;
       let newLeft = dragState.origLeft + dPct;
-      // 10分スナップ
-      const snapPct = (10 / tMin) * 100;
+      // 5分スナップ
+      const snapPct = (5 / tMin) * 100;
       newLeft = Math.round(newLeft / snapPct) * snapPct;
       newLeft = Math.max(0, Math.min(newLeft, 100 - dragState.origWidth));
       dragState.el.style.left = newLeft + '%';
@@ -1838,7 +1838,7 @@ function renderGrid() {
       }
       const rect = tc.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
-      const clickMin = Math.round(pct * totalH * 60 / 10) * 10;
+      const clickMin = Math.round(pct * totalH * 60 / 5) * 5;
       const h = bh.start + Math.floor(clickMin / 60);
       const m = clickMin % 60;
       openAddModal(tc.dataset.room, h, m, bh);
@@ -2267,7 +2267,7 @@ function openSearchModal() {
     `<button class="search-filter-btn${searchSelectedDuration === d ? ' active' : ''}" data-dur="${d}">${d}分</button>`
   ).join('');
   durHtml += `<div style="display:flex;align-items:center;gap:4px;margin-top:4px;width:100%">
-    <input type="number" id="searchDurationCustom" min="10" max="480" step="10" value="${isCustom ? searchSelectedDuration : ''}" placeholder="任意（分）" style="width:100px;padding:6px;border:2px solid ${isCustom ? 'var(--accent)' : 'var(--border-default)'};border-radius:8px;font-size:13px;font-weight:700">
+    <input type="number" id="searchDurationCustom" min="5" max="480" step="5" value="${isCustom ? searchSelectedDuration : ''}" placeholder="任意（分）" style="width:100px;padding:6px;border:2px solid ${isCustom ? 'var(--accent)' : 'var(--border-default)'};border-radius:8px;font-size:13px;font-weight:700">
     <button class="search-filter-btn${isCustom ? ' active' : ''}" id="searchDurationCustomBtn">設定</button>
   </div>`;
   durEl.innerHTML = durHtml;
@@ -2280,8 +2280,8 @@ function openSearchModal() {
   });
   document.getElementById('searchDurationCustomBtn').addEventListener('click', () => {
     const v = parseInt(document.getElementById('searchDurationCustom').value);
-    if (v && v >= 10) { searchSelectedDuration = v; openSearchModal(); }
-    else alert('10分以上で入力してください');
+    if (v && v >= 5) { searchSelectedDuration = v; openSearchModal(); }
+    else alert('5分以上で入力してください');
   });
 
   document.getElementById('searchModal').classList.add('active');
@@ -2380,13 +2380,13 @@ async function executeSearch() {
 
       dayRes.forEach(r => {
         if (cursor + duration <= r.start) {
-          for (let t = cursor; t + duration <= r.start; t += 10) {
+          for (let t = cursor; t + duration <= r.start; t += 5) {
             slots.push(t);
           }
         }
         cursor = Math.max(cursor, r.end);
       });
-      for (let t = cursor; t + duration <= staffEndMin; t += 10) {
+      for (let t = cursor; t + duration <= staffEndMin; t += 5) {
         slots.push(t);
       }
 
@@ -2420,12 +2420,12 @@ async function executeSearch() {
       }
 
       if (slots.length > 0) {
-        // 連続する10分刻みをまとめて範囲表示
+        // 連続する5分刻みをまとめて範囲表示
         const displaySlots = [];
         let rangeStart = slots[0];
         let prev = slots[0];
         for (let i = 1; i <= slots.length; i++) {
-          if (i < slots.length && slots[i] === prev + 10) {
+          if (i < slots.length && slots[i] === prev + 5) {
             prev = slots[i];
           } else {
             if (rangeStart === prev) {
