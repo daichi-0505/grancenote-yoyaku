@@ -1490,13 +1490,13 @@ function renderGrid() {
     html += `<div class="room-label" style="width:${labelW}px">${room.name}${room.sub ? '<span class="room-sublabel">'+room.sub+'</span>' : ''}</div>`;
     html += `<div class="time-cells" data-room="${room.id}">`;
 
-    const totalQ = totalH * 4;
+    const totalQ = totalH * 6;
     for (let q = 0; q <= totalQ; q++) {
       const pct = q / totalQ * 100;
       let cls = 'grid-line';
       if (q === totalQ) cls += ' end';
-      else if (q % 4 === 0) cls += ' hour';
-      else if (q % 2 === 0) cls += ' half';
+      else if (q % 6 === 0) cls += ' hour';
+      else if (q % 3 === 0) cls += ' half';
       else cls += ' quarter';
       html += `<div class="${cls}" style="left:${pct}%"></div>`;
     }
