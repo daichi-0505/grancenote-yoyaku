@@ -2106,6 +2106,42 @@ function getSubAssignments() {
   }));
 }
 
+// 時間変更時にアフターケア終了も連動させる
+function setupTimeChangeListeners() {
+  let prevStartMin = null, prevEndMin = null;
+  function toMin(v) { const [h,m] = v.split(':').map(Number); return h*60+m; }
+  function fromMin(m) { return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`; }
+  function snapshot() {
+    prevStartMin = toMin(document.getElementById('resStart').value);
+    prevEndMin = toMin(document.getElementById('resEnd').value);
+  }
+  snapshot();
+  document.getElementById('resStart').onchange = function() {
+    const newStartMin = toMin(this.value);
+    const delta = newStartMin - prevStartMin;
+    if (delta !== 0) {
+      // 終了時間もシフト
+      const endEl = document.getElementById('resEnd');
+      const newEndMin = toMin(endEl.value) + delta;
+      endEl.value = fromMin(newEndMin);
+      // アフターケアもシフト
+      const acEl = document.getElementById('resAftercareEnd');
+      if (acEl.value) { acEl.value = fromMin(toMin(acEl.value) + delta); }
+    }
+    snapshot();
+  };
+  document.getElementById('resEnd').onchange = function() {
+    endTimeManuallySet = true;
+    const newEndMin = toMin(this.value);
+    const delta = newEndMin - prevEndMin;
+    if (delta !== 0) {
+      const acEl = document.getElementById('resAftercareEnd');
+      if (acEl.value) { acEl.value = fromMin(toMin(acEl.value) + delta); }
+    }
+    snapshot();
+  };
+}
+
 function openAddModal(roomId, hour, mins, bh) {
   editingRes = null;
   setType('treatment');
@@ -2127,7 +2163,7 @@ function openAddModal(roomId, hour, mins, bh) {
   let eh = hour + 1, em = mins;
   if (eh > bh.end || (eh === bh.end && em > 0)) { eh = bh.end; em = 0; }
   document.getElementById('resEnd').value = `${eh}:${String(em).padStart(2,'0')}`;
-  document.getElementById('resEnd').onchange = () => { endTimeManuallySet = true; };
+  setupTimeChangeListeners();
   document.getElementById('modalFooter').innerHTML = `
     <button class="btn btn-cancel" onclick="closeModal('reservationModal')">キャンセル</button>
     <button class="btn btn-primary" onclick="saveReservation()">保存</button>`;
@@ -2608,10 +2644,10 @@ function openEditModal(res) {
   populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(res.roomId);
   document.getElementById('resStart').value = res.start;
   document.getElementById('resEnd').value = res.end;
-  document.getElementById('resEnd').onchange = () => { endTimeManuallySet = true; };
   document.getElementById('resStaff').value = res.staffId || '';
   document.getElementById('resAftercareEnd').value = res.aftercareEnd || '';
   document.getElementById('resAftercareStaff').value = res.aftercareStaffId || '';
+  setupTimeChangeListeners();
   // ブロックの場合、部屋とスタッフを復元
   if (type === 'block') {
     populateBlockFields();
