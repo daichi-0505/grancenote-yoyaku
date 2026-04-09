@@ -1086,6 +1086,7 @@ let dayKarteStatusMap = {}; // customer_id → karte status for current date
 let dayCustomerInfoMap = {}; // customer_id → {birthday, is_new, membership_plan}
 
 async function syncDayDataFromApi() {
+  if (savingInProgress) return; // 保存中はsyncしない（古いデータで上書き防止）
   const dk = dateKey(currentDate);
   try {
     const [resData, stateData, shiftData, karteData] = await Promise.all([
@@ -1611,11 +1612,11 @@ function renderGrid() {
         html += `<span class="res-type-tag">${typeLabels[type]}</span>`;
       }
       if (type !== 'practice' && res.menu) html += `<span class="res-menu-label">${res.menu}</span>`;
-      if (type === 'treatment' && res.customerId) {
-        const _ci = dayCustomerInfoMap[res.customerId];
-        if (_ci && _ci.default_duration) {
-          html += `<span class="res-menu-label res-duration-label">${_ci.default_duration}分</span>`;
-        }
+      if (type === 'treatment' || type === 'shopping') {
+        const [_sh,_sm] = res.start.split(':').map(Number);
+        const [_eh,_em] = res.end.split(':').map(Number);
+        const _dur = (_eh*60+_em) - (_sh*60+_sm);
+        if (_dur > 0) html += `<span class="res-menu-label res-duration-label">${_dur}分</span>`;
       }
       if (res.memo) html += `<span class="res-memo-tag">${res.memo}</span>`;
       html += '</div>';
@@ -1635,7 +1636,7 @@ function renderGrid() {
         const acMin = (ach - bh.start) * 60 + acm;
         const acLeft = eMin / tMin * 100;
         const acWidth = Math.max((acMin - eMin) / tMin * 100, 0.5);
-        html += `<div class="aftercare-line" style="left:${acLeft}%;width:${acWidth}%;background:${acColor}"></div>`;
+        html += `<div class="aftercare-line" data-ac-for="${res.id}" style="left:${acLeft}%;width:${acWidth}%;background:${acColor}"></div>`;
       }
       // 分担表示はグラデーションで処理済み（別要素なし）
     });
@@ -1681,13 +1682,15 @@ function renderGrid() {
           const tcRect = tc.getBoundingClientRect();
           resEl.classList.add('dragging');
           resEl.style.transition = 'none';
+          const acLine = tc.querySelector(`[data-ac-for="${res.id}"]`);
           dragState = {
             res, el: resEl, startX: e.clientX, startY: e.clientY,
             origLeft: parseFloat(resEl.style.left),
             origWidth: parseFloat(resEl.style.width),
             roomId: tc.dataset.room,
             origRoomId: tc.dataset.room,
-            tcRect, moved: false
+            tcRect, moved: false,
+            acLine, acOrigLeft: acLine ? parseFloat(acLine.style.left) : 0
           };
           // ゴースト（元の位置表示）
           const ghost = document.createElement('div');
@@ -1723,6 +1726,10 @@ function renderGrid() {
       newLeft = Math.round(newLeft / snapPct) * snapPct;
       newLeft = Math.max(0, Math.min(newLeft, 100 - dragState.origWidth));
       dragState.el.style.left = newLeft + '%';
+      // アフターケア線も追従
+      if (dragState.acLine) {
+        dragState.acLine.style.left = (dragState.acOrigLeft + (newLeft - dragState.origLeft)) + '%';
+      }
 
       // 縦移動（部屋変更）
       const allTcs = wrapper.querySelectorAll('.time-cells');
@@ -1859,11 +1866,13 @@ async function dragConfirmResult(ok) {
     allRes[dateKey(currentDate)] = dayReservations;
     lsSave('reservations', allRes);
     renderGrid();
+    savingInProgress = true;
     const saved = await sbUpsert('yoyaku_reservations', {
       id: ds.res.id, start_time: newStart, end_time: newEnd,
       room_id: newRoomId, aftercare_end: newAC || null,
       updated_at: new Date().toISOString()
     });
+    savingInProgress = false;
     if (!saved) alert('予約の移動に失敗しました。電波状況を確認してください。');
   } else {
     renderGrid();
@@ -1874,6 +1883,7 @@ async function dragConfirmResult(ok) {
 // ── Modals ──
 let editingRes = null;
 let endTimeManuallySet = false;
+let savingInProgress = false;
 let currentType = 'treatment';
 
 function setType(type) {
@@ -2695,6 +2705,7 @@ async function saveReservation() {
   renderGrid();
 
   // Supabaseに保存（完了を待つ）
+  savingInProgress = true;
   const ok = await sbUpsert('yoyaku_reservations', {
     id: data.id, date: data.date, name: data.name, menu: data.menu,
     staff_id: data.staffId || null, start_time: data.start, end_time: data.end,
@@ -2708,6 +2719,7 @@ async function saveReservation() {
     customer_id: document.getElementById('resCustomerId').value || null,
     updated_at: new Date().toISOString()
   });
+  savingInProgress = false;
   if (!ok) alert('予約の保存に失敗しました。電波状況を確認して再度お試しください。');
   closeModal('reservationModal');
 }
@@ -2724,7 +2736,9 @@ async function deleteReservation() {
   lsSave('reservations', allRes);
   renderGrid();
   // Supabaseからも削除（完了を待つ）
+  savingInProgress = true;
   const ok = await sbDelete('yoyaku_reservations', `id=eq.${id}`);
+  savingInProgress = false;
   if (!ok) alert('予約の削除に失敗しました。電波状況を確認して再度お試しください。');
   closeModal('reservationModal');
 }
