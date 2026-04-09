@@ -1,6 +1,6 @@
 // 予約帳 Service Worker v6 — 連続施術の区切り改善
 // キャッシュなし。常にネットワークから取得。
-const CACHE_NAME = 'yoyaku-v46';
+const CACHE_NAME = 'yoyaku-v47';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {
