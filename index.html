@@ -930,7 +930,6 @@ const DEFAULT_STAFF = [
   { id: 's4', name: '峯 敏絵', color: '#43A047' },
   { id: 's2', name: 'リン ション', color: '#FB8C00' },
   { id: 's3', name: '西村 由維', color: '#8E24AA' },
-  { id: 's5', name: '林 美志', color: '#00897B' },
 ];
 
 // シフトデータ（Supabaseから取得。デフォルトフォールバック用）
@@ -1076,7 +1075,7 @@ async function syncConfigFromApi() {
       sbGet('yoyaku_checks', 'order=sort_order'),
     ]);
     if (staffData) {
-      staff = staffData.map(s => ({ id: s.id, name: s.name, color: s.color, sortOrder: s.sort_order }));
+      staff = staffData.filter(s => s.id !== 's5').map(s => ({ id: s.id, name: s.name, color: s.color, sortOrder: s.sort_order }));
       lsSave('staff', staff);
     }
     if (roomData) {
@@ -1194,7 +1193,7 @@ function renderHeader() {
 let shiftOpen = false;
 
 // スタッフ並び順: 出勤>休み、正社員>パート>先生(敏絵)
-const STAFF_RANK = { 's1': 1, 's9': 2, 's2': 3, 's3': 4, 's5': 5, 's4': 6 }; // 琴音,朝倉(正社員) → リン,西村,林(パート) → 敏絵(先生)
+const STAFF_RANK = { 's1': 1, 's9': 2, 's2': 3, 's3': 4, 's4': 5 }; // 琴音,朝倉(正社員) → リン,西村(パート) → 敏絵(先生)
 const STAFF_SHORT = { 's4': '先生' };
 function shortName(s) { return STAFF_SHORT[s.id] || s.name.replace(' ', ''); }
 function renderStaffStatus() {
