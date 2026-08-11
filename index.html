@@ -1194,12 +1194,19 @@ let shiftOpen = false;
 
 // スタッフ並び順: 出勤>休み、正社員>パート>先生(敏絵)
 const STAFF_RANK = { 's1': 1, 's9': 2, 's2': 3, 's3': 4, 's4': 5 }; // 琴音,朝倉(正社員) → リン,西村(パート) → 敏絵(先生)
+// 退職者: 新規の割り当て/設定候補からは除外するが、staff配列には残す（過去予約の担当名表示・検索は維持）。
+// keepIds に現在の割当値を渡すと、その退職者だけは選択肢に残す（既存予約を再保存しても担当が消えないように）。
+const RETIRED_STAFF_IDS = ['s2']; // リン ション（2026年7月末退職）
+function selectableStaff(keepIds) {
+  const keep = keepIds || [];
+  return staff.filter(s => !RETIRED_STAFF_IDS.includes(s.id) || keep.includes(s.id));
+}
 const STAFF_SHORT = { 's4': '先生' };
 function shortName(s) { return STAFF_SHORT[s.id] || s.name.replace(' ', ''); }
 function renderStaffStatus() {
   const bar = document.getElementById('staffStatusBar');
   bar.innerHTML = '';
-  const sorted = [...staff].sort((a, b) => {
+  const sorted = [...selectableStaff()].sort((a, b) => {
     const aShift = getStaffShift(a.id, currentDate) ? 0 : 1;
     const bShift = getStaffShift(b.id, currentDate) ? 0 : 1;
     if (aShift !== bShift) return aShift - bShift;
@@ -1954,7 +1961,7 @@ function setType(type) {
 const PRACTICE_MENUS = ['フェイシャル', 'インディバ', 'コルギ', 'クロージング'];
 let selectedPracticeMenu = '';
 
-function populatePracticeFields() {
+function populatePracticeFields(keepIds) {
   // メニュー選択
   const menuEl = document.getElementById('practiceMenuSelector');
   menuEl.innerHTML = PRACTICE_MENUS.map(m =>
@@ -1973,7 +1980,7 @@ function populatePracticeFields() {
   // スタッフチェックボックス
   const checksEl = document.getElementById('practiceStaffChecks');
   const prevChecked = Array.from(checksEl.querySelectorAll('input:checked')).map(i => i.value);
-  checksEl.innerHTML = staff.map(s => {
+  checksEl.innerHTML = selectableStaff((keepIds || []).concat(prevChecked)).map(s => {
     const checked = prevChecked.includes(s.id) ? 'checked' : '';
     return `<label class="practice-staff-check${checked ? ' checked' : ''}">
       <input type="checkbox" value="${s.id}" ${checked}>
@@ -1988,7 +1995,7 @@ function populatePracticeFields() {
   });
 }
 
-function populateBlockFields() {
+function populateBlockFields(keepIds) {
   // 部屋チェックボックス
   const roomEl = document.getElementById('blockRoomChecks');
   const prevRooms = Array.from(roomEl.querySelectorAll('input:checked')).map(i => i.value);
@@ -2004,7 +2011,7 @@ function populateBlockFields() {
   // スタッフチェックボックス
   const staffEl = document.getElementById('blockStaffChecks');
   const prevStaff = Array.from(staffEl.querySelectorAll('input:checked')).map(i => i.value);
-  staffEl.innerHTML = staff.map(s => {
+  staffEl.innerHTML = selectableStaff((keepIds || []).concat(prevStaff)).map(s => {
     const checked = prevStaff.includes(s.id) ? 'checked' : '';
     return `<label class="practice-staff-check${checked ? ' checked' : ''}">
       <input type="checkbox" value="${s.id}" ${checked}>
@@ -2037,11 +2044,12 @@ function populateTimeSelects(bh) {
   const acEnd = document.getElementById('resAftercareEnd');
   acEnd.innerHTML = '<option value="">なし</option>' + opts.map(t => `<option value="${t}">${t}</option>`).join('');
 }
-function populateStaffSelect() {
-  const staffOpts = '<option value="">未定</option>' + staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+function populateStaffSelect(keepIds) {
+  const list = selectableStaff(keepIds);
+  const staffOpts = '<option value="">未定</option>' + list.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   document.getElementById('resStaff').innerHTML = staffOpts;
   // アフターケア担当
-  document.getElementById('resAftercareStaff').innerHTML = '<option value="">施術と同じ</option>' + staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  document.getElementById('resAftercareStaff').innerHTML = '<option value="">施術と同じ</option>' + list.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
 }
 function populateRoomSelect(rid) {
   document.getElementById('resRoom').innerHTML = rooms.map(r => `<option value="${r.id}" ${r.id===rid?'selected':''}>${r.name}</option>`).join('');
@@ -2055,7 +2063,7 @@ function populateSubAssignments(subs) {
     row.className = 'sub-assignment';
     row.innerHTML = `
       <select class="sub-staff" data-idx="${i}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px;flex:1">
-        ${staff.map(s => `<option value="${s.id}" ${s.id===sub.staffId?'selected':''}>${s.name}</option>`).join('')}
+        ${selectableStaff([sub.staffId]).map(s => `<option value="${s.id}" ${s.id===sub.staffId?'selected':''}>${s.name}</option>`).join('')}
       </select>
       <select class="sub-start" data-idx="${i}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px">
         ${getTimeOpts(getBH(currentDate)).map(t => `<option value="${t}" ${t===sub.start?'selected':''}>${t}</option>`).join('')}
@@ -2081,7 +2089,7 @@ document.getElementById('addSubAssignment').addEventListener('click', () => {
   row.className = 'sub-assignment';
   row.innerHTML = `
     <select class="sub-staff" data-idx="${idx}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px;flex:1">
-      ${staff.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+      ${selectableStaff().map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
     </select>
     <select class="sub-start" data-idx="${idx}" style="font-size:13px;padding:4px;border:1px solid var(--border-default);border-radius:6px">
       ${getTimeOpts(getBH(currentDate)).map(t => `<option value="${t}" ${t===start?'selected':''}>${t}</option>`).join('')}
@@ -2643,7 +2651,7 @@ function openEditModal(res) {
   document.getElementById('resMemo').value = res.memo || '';
   document.getElementById('resCheckedIn').checked = !!res.checkedIn;
   endTimeManuallySet = true; // 編集時は既存の時間を優先
-  populateTimeSelects(bh); populateStaffSelect(); populateRoomSelect(res.roomId);
+  populateTimeSelects(bh); populateStaffSelect([res.staffId, res.aftercareStaffId]); populateRoomSelect(res.roomId);
   document.getElementById('resStart').value = res.start;
   document.getElementById('resEnd').value = res.end;
   document.getElementById('resStaff').value = res.staffId || '';
@@ -2652,7 +2660,7 @@ function openEditModal(res) {
   setupTimeChangeListeners();
   // ブロックの場合、部屋とスタッフを復元
   if (type === 'block') {
-    populateBlockFields();
+    populateBlockFields(res.blockStaffIds);
     if (res.blockRoomIds) {
       res.blockRoomIds.forEach(rid => {
         const cb = document.querySelector(`#blockRoomChecks input[value="${rid}"]`);
@@ -2675,7 +2683,7 @@ function openEditModal(res) {
     } else if (res.menu) {
       document.getElementById('practiceMenuCustom').value = res.menu;
     }
-    populatePracticeFields();
+    populatePracticeFields(res.practiceStaffIds);
     if (res.practiceStaffIds) {
       res.practiceStaffIds.forEach(sid => {
         const cb = document.querySelector(`#practiceStaffChecks input[value="${sid}"]`);
